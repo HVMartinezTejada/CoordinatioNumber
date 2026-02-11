@@ -3,7 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import numpy as np
-import py3dmol
+import py3Dmol
 
 # 1. CONFIGURACIÓN INICIAL
 st.set_page_config(page_title="Simulador r/R - NC", layout="wide")
@@ -436,3 +436,4 @@ with st.expander("🎨 Guía de colores y explicación teórica"):
 # 12. PIE DE PÁGINA
 # ============================================================
 st.caption("App desarrollada con fines académicos por HV Martínez-Tejada. Basado en las reglas de radios de Pauling. Visualizaciones 3D con Py3Dmol.")
+
