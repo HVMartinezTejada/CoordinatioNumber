@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import numpy as np
+import py3dmol
 
 # 1. CONFIGURACIÓN INICIAL
 st.set_page_config(page_title="Simulador r/R - NC", layout="wide")
@@ -12,15 +13,147 @@ st.markdown("""
 determina el número de coordinación (NC) estable en un sólido iónico, asumiendo el modelo de esferas rígidas.
 """)
 
-# 2. DEFINICIÓN DE CONSTANTES Y LÍMITES (Reglas de Pauling)
+# 2. DEFINICIÓN DE CONSTANTES Y LÍMITES
 LIMITES_NC = [0.155, 0.225, 0.414, 0.732, 1.000]
 NC_TIPICOS = [3, 4, 6, 8, 12]
 GEOMETRIAS = ["Triangular", "Tetraédrica", "Octaédrica", "Cúbica", "Cuboctaédrica (Compacta)"]
 
-# 3. PALETA DE COLORES VIRIDIS (índice 0 → NC=3, 1→ NC=4, 2→ NC=6, 3→ NC=8, 4→ NC=12)
+# 3. PALETA DE COLORES VIRIDIS
 colors = [cm.viridis(i / (len(NC_TIPICOS) - 1)) for i in range(len(NC_TIPICOS))]
 
-# 4. INTERFAZ DE USUARIO (Sidebar para Controles)
+# ============================================================
+# 4. FUNCIONES PARA VISUALIZACIONES 3D CON PY3DMOL
+# ============================================================
+def visualizar_nc3():
+    """Triangular planar (3 aniones en un plano, ángulos 120°)"""
+    vertices = [
+        [1.0, 0.0, 0.0],
+        [-0.5, np.sqrt(3)/2, 0.0],
+        [-0.5, -np.sqrt(3)/2, 0.0]
+    ]
+    view = py3dmol.view(width=300, height=300)
+    # Aniones (rojo)
+    for v in vertices:
+        view.addSphere({'center': {'x': v[0], 'y': v[1], 'z': v[2]},
+                        'radius': 0.3, 'color': 'red', 'alpha': 0.9})
+    # Catión central (azul)
+    view.addSphere({'center': {'x': 0, 'y': 0, 'z': 0},
+                    'radius': 0.2, 'color': 'blue', 'alpha': 0.9})
+    # Enlaces (gris)
+    for v in vertices:
+        view.addCylinder({'start': {'x': 0, 'y': 0, 'z': 0},
+                          'end': {'x': v[0], 'y': v[1], 'z': v[2]},
+                          'radius': 0.05, 'color': 'gray'})
+    view.zoomTo()
+    return view
+
+def visualizar_nc4():
+    """Tetraedro"""
+    vertices = [
+        [1, 1, 1],
+        [1, -1, -1],
+        [-1, 1, -1],
+        [-1, -1, 1]
+    ]
+    # Normalizar a distancia 1
+    vertices = [[v[0]/3**0.5, v[1]/3**0.5, v[2]/3**0.5] for v in vertices]
+    view = py3dmol.view(width=300, height=300)
+    for v in vertices:
+        view.addSphere({'center': {'x': v[0], 'y': v[1], 'z': v[2]},
+                        'radius': 0.3, 'color': 'red', 'alpha': 0.9})
+    view.addSphere({'center': {'x': 0, 'y': 0, 'z': 0},
+                    'radius': 0.2, 'color': 'blue', 'alpha': 0.9})
+    for v in vertices:
+        view.addCylinder({'start': {'x': 0, 'y': 0, 'z': 0},
+                          'end': {'x': v[0], 'y': v[1], 'z': v[2]},
+                          'radius': 0.05, 'color': 'gray'})
+    view.zoomTo()
+    return view
+
+def visualizar_nc6():
+    """Octaedro"""
+    vertices = [
+        [1, 0, 0], [-1, 0, 0],
+        [0, 1, 0], [0, -1, 0],
+        [0, 0, 1], [0, 0, -1]
+    ]
+    view = py3dmol.view(width=300, height=300)
+    for v in vertices:
+        view.addSphere({'center': {'x': v[0], 'y': v[1], 'z': v[2]},
+                        'radius': 0.3, 'color': 'red', 'alpha': 0.9})
+    view.addSphere({'center': {'x': 0, 'y': 0, 'z': 0},
+                    'radius': 0.2, 'color': 'blue', 'alpha': 0.9})
+    for v in vertices:
+        view.addCylinder({'start': {'x': 0, 'y': 0, 'z': 0},
+                          'end': {'x': v[0], 'y': v[1], 'z': v[2]},
+                          'radius': 0.05, 'color': 'gray'})
+    view.zoomTo()
+    return view
+
+def visualizar_nc8():
+    """Cubo (8 aniones en vértices de cubo)"""
+    vertices = [
+        [1, 1, 1], [1, 1, -1], [1, -1, 1], [1, -1, -1],
+        [-1, 1, 1], [-1, 1, -1], [-1, -1, 1], [-1, -1, -1]
+    ]
+    # Normalizar a distancia 1
+    vertices = [[v[0]/3**0.5, v[1]/3**0.5, v[2]/3**0.5] for v in vertices]
+    view = py3dmol.view(width=300, height=300)
+    for v in vertices:
+        view.addSphere({'center': {'x': v[0], 'y': v[1], 'z': v[2]},
+                        'radius': 0.3, 'color': 'red', 'alpha': 0.9})
+    view.addSphere({'center': {'x': 0, 'y': 0, 'z': 0},
+                    'radius': 0.2, 'color': 'blue', 'alpha': 0.9})
+    for v in vertices:
+        view.addCylinder({'start': {'x': 0, 'y': 0, 'z': 0},
+                          'end': {'x': v[0], 'y': v[1], 'z': v[2]},
+                          'radius': 0.05, 'color': 'gray'})
+    view.zoomTo()
+    return view
+
+def visualizar_nc12():
+    """
+    Cuboctaedro (12 aniones) - empaquetamiento compacto.
+    Coordenadas de un cuboctaedro de radio 1.
+    """
+    # Vértices de un cuboctaedro: permutaciones de (±1, ±1, 0) y ciclos
+    vertices = []
+    for i in range(3):
+        for s1 in [-1, 1]:
+            for s2 in [-1, 1]:
+                v = [0, 0, 0]
+                v[i] = s1
+                v[(i+1)%3] = s2
+                vertices.append(v[:])
+    # Normalizar a distancia 1 (ya están a distancia sqrt(2), ajustamos)
+    vertices = [[v[0]/2**0.5, v[1]/2**0.5, v[2]/2**0.5] for v in vertices]
+    
+    view = py3dmol.view(width=300, height=300)
+    for v in vertices:
+        view.addSphere({'center': {'x': v[0], 'y': v[1], 'z': v[2]},
+                        'radius': 0.25, 'color': 'red', 'alpha': 0.9})
+    view.addSphere({'center': {'x': 0, 'y': 0, 'z': 0},
+                    'radius': 0.2, 'color': 'blue', 'alpha': 0.9})
+    # Enlaces (opcional, muchos enlaces, solo algunos representativos)
+    for v in vertices[:6]:  # solo algunos para no saturar
+        view.addCylinder({'start': {'x': 0, 'y': 0, 'z': 0},
+                          'end': {'x': v[0], 'y': v[1], 'z': v[2]},
+                          'radius': 0.05, 'color': 'gray'})
+    view.zoomTo()
+    return view
+
+# Diccionario de funciones de visualización
+visualizadores = {
+    3: visualizar_nc3,
+    4: visualizar_nc4,
+    6: visualizar_nc6,
+    8: visualizar_nc8,
+    12: visualizar_nc12
+}
+
+# ============================================================
+# 5. INTERFAZ DE USUARIO (Sidebar)
+# ============================================================
 with st.sidebar:
     st.header("⚙️ Controles de los Radios Iónicos")
     st.caption("Ajusta los valores en Ångströms (Å).")
@@ -54,10 +187,11 @@ with st.sidebar:
         y_min_zoom = 0.0
         st.rerun()
 
-# 5. CÁLCULO PRINCIPAL
+# ============================================================
+# 6. CÁLCULO PRINCIPAL
+# ============================================================
 relacion_r_R = radio_cation / radio_anion if radio_anion > 0 else 0
 
-# Determinar el NC basado en los límites (corregido)
 nc_predicho = NC_TIPICOS[-1]  # 12
 geometria_predicha = GEOMETRIAS[-1]
 
@@ -67,7 +201,9 @@ for i, limite in enumerate(LIMITES_NC):
         geometria_predicha = GEOMETRIAS[i]
         break
 
-# 6. VISUALIZACIÓN DE RESULTADOS
+# ============================================================
+# 7. VISUALIZACIÓN DE RESULTADOS (métricas)
+# ============================================================
 col1, col2, col3 = st.columns(3)
 with col1:
     st.metric(label="Relación r/R", value=f"{relacion_r_R:.3f}")
@@ -76,7 +212,9 @@ with col2:
 with col3:
     st.metric(label="Geometría", value=geometria_predicha)
 
-# 7. BARRA DE PROGRESO/INDICADOR VISUAL
+# ============================================================
+# 8. BARRA DE PROGRESO Y TABLA DE LÍMITES
+# ============================================================
 st.subheader("📊 Umbrales de Estabilidad para cada NC")
 df_limites = pd.DataFrame({
     "NC": NC_TIPICOS,
@@ -92,7 +230,9 @@ st.progress(posicion_relativa)
 marcadores = " | ".join([f"{limite:.3f} (NC={nc})" for limite, nc in zip(LIMITES_NC, NC_TIPICOS)])
 st.caption(f"**Límites:** {marcadores}")
 
-# 8. GRÁFICOS INTERACTIVOS
+# ============================================================
+# 9. GRÁFICOS INTERACTIVOS (dos columnas)
+# ============================================================
 st.subheader("📈 Relación entre R y r/R")
 
 col_grafica1, col_grafica2 = st.columns(2)
@@ -101,7 +241,7 @@ col_grafica1, col_grafica2 = st.columns(2)
 R_range_full = [i/100 for i in range(10, 701)]
 r_R_range_full = [radio_cation / R if R > 0 else 0 for R in R_range_full]
 
-# --- GRÁFICA 1: Vista completa (corregida) ---
+# --- GRÁFICA 1: Vista completa ---
 with col_grafica1:
     st.markdown("**Vista completa – modelo extendido**")
     fig1, ax1 = plt.subplots(figsize=(8, 5))
@@ -111,7 +251,6 @@ with col_grafica1:
     ax1.axvline(x=radio_anion, color='g', linestyle='--', alpha=0.7, linewidth=1.5,
                 label=f'R actual ({radio_anion:.2f} Å)')
     
-    # --- CORRECCIÓN: Asignación correcta de intervalos y colores ---
     for i, nc in enumerate(NC_TIPICOS):
         y_min = 0 if i == 0 else LIMITES_NC[i-1]
         y_max = LIMITES_NC[i]
@@ -132,11 +271,10 @@ with col_grafica1:
     ax1.grid(alpha=0.3)
     st.pyplot(fig1)
 
-# --- GRÁFICA 2: Vista de zoom (corregida) ---
+# --- GRÁFICA 2: Vista de zoom dinámico ---
 with col_grafica2:
     st.markdown("**Vista de zoom – análisis detallado (gráfica principal)**")
     
-    # Zoom horizontal alrededor de R actual
     margen = 1.0
     x_min = max(0.1, radio_anion - margen)
     x_max = radio_anion + margen
@@ -150,17 +288,13 @@ with col_grafica2:
         r_R_range_zoom = [r_R_range_full[i] for i in indices]
     
     fig2, ax2 = plt.subplots(figsize=(8, 5))
-    
-    # Curva azul
     ax2.plot(R_range_zoom, r_R_range_zoom, 'b-', linewidth=2.5, label='r/R')
     ax2.axhline(y=relacion_r_R, color='r', linestyle='--', alpha=0.7, linewidth=1.5,
                 label=f'Valor actual ({relacion_r_R:.2f})')
     ax2.axvline(x=radio_anion, color='g', linestyle='--', alpha=0.7, linewidth=1.5,
                 label=f'R actual ({radio_anion:.2f} Å)')
     
-    # ------------------------------------------------------------------
-    # 🟣 TRANSICIÓN 2D → 3D
-    # ------------------------------------------------------------------
+    # Transición 2D/3D
     R_transicion = radio_cation / 0.225
     if x_min <= R_transicion <= x_max:
         ax2.axvline(x=R_transicion, color='purple', linestyle='-.', linewidth=1.8, alpha=0.9,
@@ -168,39 +302,26 @@ with col_grafica2:
     ax2.axhline(y=0.225, color='purple', linestyle='-.', linewidth=1.8, alpha=0.9,
                 label='Límite 2D/3D (r/R = 0.225)')
     
-    # ------------------------------------------------------------------
-    # 🌫️ REGIÓN 2D (NC=3) - Trama gris (exclusiva)
-    # ------------------------------------------------------------------
-    ax2.axhspan(0.155, 0.225, alpha=0.4, color='#555555', hatch='///', 
+    # Región 2D (NC=3) - trama gris
+    ax2.axhspan(0.155, 0.225, alpha=0.4, color='#555555', hatch='///',
                 label='Región 2D (NC=3, planar)')
     if y_max_zoom > 0.19:
         ax2.text(x_min + 0.1, 0.19, '2D', fontsize=11, weight='bold', color='white',
                  bbox=dict(boxstyle='round', facecolor='#555555', alpha=0.8))
     
-    # ------------------------------------------------------------------
-    # 🌈 REGIONES 3D (NC ≥ 4) - VIRIDIS, cada una con su color correcto
-    # ------------------------------------------------------------------
-    # NC=4  (0.225 - 0.414) -> colors[1]
+    # Regiones 3D (NC≥4) - viridis
     ax2.axhspan(0.225, 0.414, alpha=0.35, color=colors[1], label='NC 4')
-    # NC=6  (0.414 - 0.732) -> colors[2]
     ax2.axhspan(0.414, 0.732, alpha=0.35, color=colors[2], label='NC 6')
-    # NC=8  (0.732 - 1.000) -> colors[3]
     ax2.axhspan(0.732, 1.000, alpha=0.35, color=colors[3], label='NC 8')
-    # NC=12 (≥1.000) - solo se dibuja si y_max_zoom > 1.0
     if y_max_zoom > 1.0:
         ax2.axhspan(1.000, y_max_zoom, alpha=0.35, color=colors[4], label='NC 12')
     
-    # Etiqueta "3D" en la región de NC=4 (si es visible)
     if y_max_zoom > 0.30:
         ax2.text(x_min + 0.1, 0.30, '3D', fontsize=11, weight='bold', color='white',
                  bbox=dict(boxstyle='round', facecolor=colors[1], alpha=0.8))
     
-    # ------------------------------------------------------------------
-    # Líneas divisorias y etiquetas
-    # ------------------------------------------------------------------
-    # Línea negra en r/R=0.155
+    # Líneas divisorias NC=3 / NC=4
     ax2.axhline(y=0.155, color='black', linestyle='-', linewidth=1.0, alpha=0.5)
-    # Línea negra en r/R=0.225
     ax2.axhline(y=0.225, color='black', linestyle='-', linewidth=1.0, alpha=0.5)
     
     if y_max_zoom > 0.155:
@@ -210,12 +331,10 @@ with col_grafica2:
         ax2.text(x_max - 0.05, 0.225, 'NC=4', fontsize=8, color='black',
                  verticalalignment='bottom', horizontalalignment='right')
     
-    # Líneas punteadas para los demás límites
     for limite in [0.414, 0.732, 1.000]:
         if limite <= y_max_zoom:
             ax2.axhline(y=limite, color='gray', linestyle=':', alpha=0.4, linewidth=0.8)
     
-    # Configuración de ejes
     ax2.set_ylim(y_min_zoom, y_max_zoom)
     ax2.set_xlim(x_min, x_max)
     ax2.set_xlabel('Radio del Anión (R) [Å]', fontsize=12)
@@ -225,8 +344,43 @@ with col_grafica2:
     ax2.grid(alpha=0.3)
     st.pyplot(fig2)
 
-# 9. LEYENDA EXPLICATIVA DE COLORES
-with st.expander("🎨 Guía de colores para los Números de Coordinación"):
+# ============================================================
+# 10. VISUALIZACIONES 3D (PY3DMOL) - NUEVA SECCIÓN
+# ============================================================
+st.subheader("🧊 Geometrías de coordinación en 3D")
+st.markdown("Cada columna muestra un poliedro de coordinación. **Los aniones son esferas rojas, el catión central es azul**. Puedes rotar y hacer zoom con el mouse.")
+
+# Crear 5 columnas (una por cada NC)
+cols_viz = st.columns(5)
+
+for i, nc in enumerate(NC_TIPICOS):
+    with cols_viz[i]:
+        # Resaltar el NC actual con un borde dorado
+        if nc == nc_predicho:
+            st.markdown('<div style="border: 3px solid gold; padding: 5px; border-radius: 10px;">', unsafe_allow_html=True)
+        
+        st.markdown(f"**NC = {nc}**")
+        st.markdown(f"*{GEOMETRIAS[i]}*")
+        
+        # Generar visualización con Py3Dmol
+        view = visualizadores[nc]()
+        view_html = view._make_html()
+        st.components.v1.html(view_html, width=320, height=320)
+        
+        # Mostrar el intervalo de r/R
+        if i == 0:
+            intervalo = f"0.155 – 0.225"
+        else:
+            intervalo = f"{LIMITES_NC[i-1]:.3f} – {LIMITES_NC[i]:.3f}"
+        st.caption(f"r/R: {intervalo}")
+        
+        if nc == nc_predicho:
+            st.markdown('</div>', unsafe_allow_html=True)
+
+# ============================================================
+# 11. LEYENDA DE COLORES Y EXPLICACIÓN TEÓRICA
+# ============================================================
+with st.expander("🎨 Guía de colores y explicación teórica"):
     col_col1, col_col2, col_col3, col_col4, col_col5 = st.columns(5)
     
     with col_col1:
@@ -261,32 +415,24 @@ with st.expander("🎨 Guía de colores para los Números de Coordinación"):
         st.markdown(
             f'<div style="background-color: rgba{tuple(int(colors[4][j]*255) for j in range(3))+(0.35,)}; '
             f'padding: 15px; border-radius: 5px; text-align: center; color: white;">'
-            f'<b>NC = 12</b><br>Compacta</div>',
+            f'<b>NC = 12</b><br>Cuboctaédrica</div>',
             unsafe_allow_html=True
         )
     
     st.markdown("""
-    **Explicación de la paleta de colores (vista de zoom):**
-    - **Gris con rayas diagonales**: región 2D (NC=3, planar).
-    - **Viridis (verde-azul)**: regiones 3D (NC≥4). Cada NC tiene su propio tono, siguiendo una gradación.
-    - **Líneas púrpura**: límite \( r/R = 0.225 \) y su correspondiente \( R = r/0.225 \).
-    - **Líneas negras sólidas**: divisiones entre NC=3 y NC=4.
-    """)
-
-# 10. INFORMACIÓN CONTEXTUAL Y TEÓRICA
-with st.expander("📚 **Explicación Teórica y Consideraciones**"):
-    st.markdown("""
-    **Fundamento del modelo**
-    - Los **límites** mostrados (0.155, 0.225, 0.414, 0.732) son **umbrales geométricos** derivados de asumir iones como esferas rígidas en contacto.
-    
     **Interpretación de la transición 2D → 3D**
     - El valor **`r/R = 0.225`** es el límite inferior para la coordinación tetraédrica (3D) y el superior para la triangular (2D).
     - Para un catión de radio `r` fijo, el tamaño de anión que produce esta transición es **\( R = r / 0.225 \)**.
-    - **¡Corrección aplicada!** Ahora cada NC aparece con su color e intervalo correctos.
+    - En la gráfica de zoom, puedes **ajustar el límite superior del eje Y** para ampliar la región inferior y observar con claridad las franjas de NC=3 y NC=4.
     
-    **Cómo usar los controles de zoom**
-    - Reduce el **límite superior del eje Y** (por ejemplo, a 0.5) para **ampliar la zona de NC=3 y NC=4** y apreciar claramente sus franjas.
+    **Visualizaciones 3D**
+    - Las esferas **rojas** representan los aniones.
+    - La esfera **azul** central es el catión.
+    - Las barras grises indican las direcciones de enlace (solo algunas en NC=12 para no saturar).
+    - Puedes **rotar, desplazar y hacer zoom** sobre cada modelo con el mouse.
     """)
 
-# 11. PIE DE PÁGINA
-st.caption("App desarrollada con fines académicos por HV Martínez-Tejada. Basado en las reglas de radios de Pauling.")
+# ============================================================
+# 12. PIE DE PÁGINA
+# ============================================================
+st.caption("App desarrollada con fines académicos por HV Martínez-Tejada. Basado en las reglas de radios de Pauling. Visualizaciones 3D con Py3Dmol.")
