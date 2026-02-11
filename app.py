@@ -31,7 +31,7 @@ def visualizar_nc3():
         [-0.5, np.sqrt(3)/2, 0.0],
         [-0.5, -np.sqrt(3)/2, 0.0]
     ]
-    view = py3dmol.view(width=300, height=300)
+    view = py3Dmol.view(width=300, height=300)
     # Aniones (rojo)
     for v in vertices:
         view.addSphere({'center': {'x': v[0], 'y': v[1], 'z': v[2]},
@@ -57,7 +57,7 @@ def visualizar_nc4():
     ]
     # Normalizar a distancia 1
     vertices = [[v[0]/3**0.5, v[1]/3**0.5, v[2]/3**0.5] for v in vertices]
-    view = py3dmol.view(width=300, height=300)
+    view = py3Dmol.view(width=300, height=300)
     for v in vertices:
         view.addSphere({'center': {'x': v[0], 'y': v[1], 'z': v[2]},
                         'radius': 0.3, 'color': 'red', 'alpha': 0.9})
@@ -77,7 +77,7 @@ def visualizar_nc6():
         [0, 1, 0], [0, -1, 0],
         [0, 0, 1], [0, 0, -1]
     ]
-    view = py3dmol.view(width=300, height=300)
+    view = py3Dmol.view(width=300, height=300)
     for v in vertices:
         view.addSphere({'center': {'x': v[0], 'y': v[1], 'z': v[2]},
                         'radius': 0.3, 'color': 'red', 'alpha': 0.9})
@@ -98,7 +98,7 @@ def visualizar_nc8():
     ]
     # Normalizar a distancia 1
     vertices = [[v[0]/3**0.5, v[1]/3**0.5, v[2]/3**0.5] for v in vertices]
-    view = py3dmol.view(width=300, height=300)
+    view = py3Dmol.view(width=300, height=300)
     for v in vertices:
         view.addSphere({'center': {'x': v[0], 'y': v[1], 'z': v[2]},
                         'radius': 0.3, 'color': 'red', 'alpha': 0.9})
@@ -128,7 +128,7 @@ def visualizar_nc12():
     # Normalizar a distancia 1 (ya están a distancia sqrt(2), ajustamos)
     vertices = [[v[0]/2**0.5, v[1]/2**0.5, v[2]/2**0.5] for v in vertices]
     
-    view = py3dmol.view(width=300, height=300)
+    view = py3Dmol.view(width=300, height=300)
     for v in vertices:
         view.addSphere({'center': {'x': v[0], 'y': v[1], 'z': v[2]},
                         'radius': 0.25, 'color': 'red', 'alpha': 0.9})
@@ -436,4 +436,5 @@ with st.expander("🎨 Guía de colores y explicación teórica"):
 # 12. PIE DE PÁGINA
 # ============================================================
 st.caption("App desarrollada con fines académicos por HV Martínez-Tejada. Basado en las reglas de radios de Pauling. Visualizaciones 3D con Py3Dmol.")
+
 
