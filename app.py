@@ -17,7 +17,7 @@ LIMITES_NC = [0.155, 0.225, 0.414, 0.732, 1.000]
 NC_TIPICOS = [3, 4, 6, 8, 12]
 GEOMETRIAS = ["Triangular", "Tetraédrica", "Octaédrica", "Cúbica", "Cuboctaédrica (Compacta)"]
 
-# 3. PALETA DE COLORES MEJORADA (viridis) - solo para NC≥4 en la gráfica de zoom
+# 3. PALETA DE COLORES VIRIDIS (solo para NC ≥ 4)
 colors = [cm.viridis(i / (len(NC_TIPICOS) - 1)) for i in range(len(NC_TIPICOS))]
 
 # 4. INTERFAZ DE USUARIO (Sidebar para Controles)
@@ -94,7 +94,7 @@ with col_grafica1:
     ax1.axvline(x=radio_anion, color='g', linestyle='--', alpha=0.7, linewidth=1.5,
                 label=f'R actual ({radio_anion:.2f} Å)')
     
-    # Añadir regiones sombreadas para todos los NC (usando viridis completo)
+    # Regiones sombreadas para todos los NC (viridis completo)
     for i in range(len(LIMITES_NC)):
         y_min = 0 if i == 0 else LIMITES_NC[i-1]
         y_max = LIMITES_NC[i]
@@ -116,7 +116,7 @@ with col_grafica1:
     ax1.grid(alpha=0.3)
     st.pyplot(fig1)
 
-# --- GRÁFICA 2: Vista de zoom dinámico + transición 2D/3D ---
+# --- GRÁFICA 2: Vista de zoom dinámico + transición 2D/3D (MEJORADA) ---
 with col_grafica2:
     st.markdown("**Vista de zoom – análisis detallado (gráfica principal)**")
     
@@ -135,7 +135,11 @@ with col_grafica2:
         r_R_range_zoom = [r_R_range_full[i] for i in indices]
     
     fig2, ax2 = plt.subplots(figsize=(8, 5))
+    
+    # Curva azul (hipérbola)
     ax2.plot(R_range_zoom, r_R_range_zoom, 'b-', linewidth=2.5, label='r/R')
+    
+    # Líneas de valor actual
     ax2.axhline(y=relacion_r_R, color='r', linestyle='--', alpha=0.7, linewidth=1.5,
                 label=f'Valor actual ({relacion_r_R:.2f})')
     ax2.axvline(x=radio_anion, color='g', linestyle='--', alpha=0.7, linewidth=1.5,
@@ -155,39 +159,44 @@ with col_grafica2:
     ax2.axhline(y=0.225, color='purple', linestyle='-.', linewidth=1.8, alpha=0.9,
                 label='Límite 2D/3D (r/R = 0.225)')
     
-    # 🌫️ Sombra gris para la región 2D (NC=3)
-    # Eliminamos el sombreado de viridis para NC3 en esta gráfica para evitar confusión
-    # y añadimos un sombreado gris distintivo
-    ax2.axhspan(0.155, 0.225, alpha=0.3, color='gray', label='Región 2D (NC=3, planar)')
+    # 🌫️🌫️ REGIÓN 2D (NC=3) - TRAMA DE RAYAS para máxima distinción
+    ax2.axhspan(0.155, 0.225, alpha=0.4, color='#555555', hatch='///', label='Región 2D (NC=3, planar)')
     
-    # 🏷️ Etiqueta "2D → 3D" en la intersección (si la vertical está visible)
-    if x_min <= R_transicion <= x_max:
-        ax2.text(R_transicion + 0.05, 0.235, '2D → 3D', 
-                 rotation=90, fontsize=9, color='purple',
-                 bbox=dict(boxstyle='round', facecolor='white', alpha=0.7))
-    else:
-        # Si la vertical no está en el rango, colocamos la etiqueta en el borde del gráfico
-        ax2.text(x_max - 0.1, 0.235, '2D → 3D', 
-                 fontsize=9, color='purple', horizontalalignment='right',
-                 bbox=dict(boxstyle='round', facecolor='white', alpha=0.7))
+    # 🏷️ Etiqueta "2D" dentro de la región
+    ax2.text(x_min + 0.1, 0.19, '2D', fontsize=11, weight='bold', color='white',
+             bbox=dict(boxstyle='round', facecolor='#555555', alpha=0.8))
     
     # ------------------------------------------------------------------
-    # Regiones sombreadas para NC ≥ 4 (colores viridis)
-    # NOTA: Excluimos NC=3 (i=0) porque ya lo cubrimos con el gris
+    # Regiones 3D (NC ≥ 4) - VIRIDIS con alpha aumentado
     # ------------------------------------------------------------------
-    for i in range(1, len(LIMITES_NC)):  # i=1,2,3,4 → NC=4,6,8,12
-        y_min = LIMITES_NC[i-1]  # límite inferior de este NC
+    for i in range(1, len(LIMITES_NC)):
+        y_min = LIMITES_NC[i-1]
         y_max = LIMITES_NC[i]
-        ax2.axhspan(y_min, y_max, alpha=0.25, color=colors[i], label=f'NC {NC_TIPICOS[i]}')
+        ax2.axhspan(y_min, y_max, alpha=0.35, color=colors[i], label=f'NC {NC_TIPICOS[i]}')
     
-    # Límites fijos del eje Y (zoom vertical)
-    ax2.set_ylim(0, 1.1)
-    ax2.set_xlim(x_min, x_max)
+    # 🏷️ Etiqueta "3D" dentro de la primera región 3D (NC=4)
+    ax2.text(x_min + 0.1, 0.30, '3D', fontsize=11, weight='bold', color='white',
+             bbox=dict(boxstyle='round', facecolor=colors[1], alpha=0.8))
     
-    # Líneas auxiliares en los límites de NC (gris punteado)
-    for limite in LIMITES_NC:
+    # ------------------------------------------------------------------
+    # LÍNEAS DIVISORIAS EXPLÍCITAS entre NC=3 y NC=4
+    # ------------------------------------------------------------------
+    ax2.axhline(y=0.155, color='black', linestyle='-', linewidth=1.0, alpha=0.5)
+    ax2.axhline(y=0.225, color='black', linestyle='-', linewidth=1.0, alpha=0.5)
+    
+    # Etiquetas de los límites
+    ax2.text(x_max - 0.05, 0.155, 'NC=3', fontsize=8, color='black',
+             verticalalignment='bottom', horizontalalignment='right')
+    ax2.text(x_max - 0.05, 0.225, 'NC=4', fontsize=8, color='black',
+             verticalalignment='bottom', horizontalalignment='right')
+    
+    # Líneas auxiliares para otros NC (gris punteado)
+    for limite in LIMITES_NC[2:]:  # 0.414, 0.732, 1.000
         ax2.axhline(y=limite, color='gray', linestyle=':', alpha=0.4, linewidth=0.8)
     
+    # Configuración de ejes
+    ax2.set_ylim(0, 1.1)
+    ax2.set_xlim(x_min, x_max)
     ax2.set_xlabel('Radio del Anión (R) [Å]', fontsize=12)
     ax2.set_ylabel('Relación r/R', fontsize=12)
     ax2.set_title(f'Zoom centrado en R = {radio_anion:.2f} Å', fontsize=14, pad=15)
@@ -195,53 +204,55 @@ with col_grafica2:
     ax2.grid(alpha=0.3)
     st.pyplot(fig2)
 
-# 9. LEYENDA EXPLICATIVA DE COLORES (actualizada)
+# 9. LEYENDA EXPLICATIVA DE COLORES (actualizada con trama para NC=3)
 with st.expander("🎨 Guía de colores para los Números de Coordinación"):
     col_col1, col_col2, col_col3, col_col4, col_col5 = st.columns(5)
     
-    # NC=3 (gris)
+    # NC=3 con trama de rayas (gris oscuro)
     with col_col1:
         st.markdown(
-            '<div style="background-color: rgba(128,128,128,0.25); '
-            'padding: 15px; border-radius: 5px; text-align: center;">'
+            '<div style="background-color: #555555; background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.2) 0px, rgba(255,255,255,0.2) 5px, transparent 5px, transparent 10px); '
+            'padding: 15px; border-radius: 5px; text-align: center; color: white;">'
             '<b>NC = 3</b><br>Triangular (2D)</div>',
             unsafe_allow_html=True
         )
     # NC=4,6,8,12 (viridis)
     with col_col2:
         st.markdown(
-            f'<div style="background-color: rgba{tuple(int(colors[1][j]*255) for j in range(3))+(0.25,)}; '
-            f'padding: 15px; border-radius: 5px; text-align: center;">'
+            f'<div style="background-color: rgba{tuple(int(colors[1][j]*255) for j in range(3))+(0.35,)}; '
+            f'padding: 15px; border-radius: 5px; text-align: center; color: white;">'
             f'<b>NC = 4</b><br>Tetraédrica</div>',
             unsafe_allow_html=True
         )
     with col_col3:
         st.markdown(
-            f'<div style="background-color: rgba{tuple(int(colors[2][j]*255) for j in range(3))+(0.25,)}; '
-            f'padding: 15px; border-radius: 5px; text-align: center;">'
+            f'<div style="background-color: rgba{tuple(int(colors[2][j]*255) for j in range(3))+(0.35,)}; '
+            f'padding: 15px; border-radius: 5px; text-align: center; color: white;">'
             f'<b>NC = 6</b><br>Octaédrica</div>',
             unsafe_allow_html=True
         )
     with col_col4:
         st.markdown(
-            f'<div style="background-color: rgba{tuple(int(colors[3][j]*255) for j in range(3))+(0.25,)}; '
-            f'padding: 15px; border-radius: 5px; text-align: center;">'
+            f'<div style="background-color: rgba{tuple(int(colors[3][j]*255) for j in range(3))+(0.35,)}; '
+            f'padding: 15px; border-radius: 5px; text-align: center; color: white;">'
             f'<b>NC = 8</b><br>Cúbica</div>',
             unsafe_allow_html=True
         )
     with col_col5:
         st.markdown(
-            f'<div style="background-color: rgba{tuple(int(colors[4][j]*255) for j in range(3))+(0.25,)}; '
-            f'padding: 15px; border-radius: 5px; text-align: center;">'
+            f'<div style="background-color: rgba{tuple(int(colors[4][j]*255) for j in range(3))+(0.35,)}; '
+            f'padding: 15px; border-radius: 5px; text-align: center; color: white;">'
             f'<b>NC = 12</b><br>Compacta</div>',
             unsafe_allow_html=True
         )
     
     st.markdown("""
     **Explicación de la paleta de colores (vista de zoom):**
-    - **Gris**: región 2D (NC=3, geometría triangular, planar).
+    - **Gris con rayas diagonales**: región 2D (NC=3, geometría triangular, planar).  
+      El rayado la diferencia claramente de las regiones 3D.
     - **Viridis (verde-azul)**: regiones 3D (NC≥4). La intensidad del color aumenta con el NC.
     - **Líneas púrpura**: marcan el límite teórico \( r/R = 0.225 \) y el valor de \( R \) correspondiente para el catión seleccionado.
+    - **Líneas negras sólidas** en \( r/R = 0.155 \) y \( 0.225 \): división explícita entre NC=3 y NC=4.
     """)
 
 # 10. INFORMACIÓN CONTEXTUAL Y TEÓRICA
@@ -254,7 +265,9 @@ with st.expander("📚 **Explicación Teórica y Consideraciones**"):
     **Interpretación de la transición 2D → 3D**
     - El valor **`r/R = 0.225`** es el límite inferior para la coordinación tetraédrica (3D) y el superior para la triangular (2D).
     - Para un catión de radio `r` fijo, el tamaño de anión que produce esta transición es **\( R = r / 0.225 \)**.
-    - En la gráfica de zoom, la **intersección de las líneas púrpura** indica este punto crítico. A la derecha (R mayor) → **2D**; a la izquierda (R menor) → **3D**.
+    - En la gráfica de zoom, la **intersección de las líneas púrpura** indica este punto crítico.  
+      → A la **derecha** de la línea vertical (R mayor) se encuentra la **región 2D** (NC=3).  
+      → A la **izquierda** (R menor) se encuentran las **regiones 3D** (NC≥4).
     
     **Limitaciones importantes del modelo simplificado**
     1.  **Iones no esféricos**: Los iones reales pueden polarizarse (deformarse).
