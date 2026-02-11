@@ -79,30 +79,63 @@ st.progress(posicion_relativa)
 marcadores = " | ".join([f"{limite:.3f} (NC={nc})" for limite, nc in zip(LIMITES_NC, NC_TIPICOS)])
 st.caption(f"**Límites:** {marcadores}")
 
-# 7. GRÁFICO INTERACTIVO (Opcional pero muy útil)
+# 7. GRÁFICOS INTERACTIVOS - MODIFICACIÓN PRINCIPAL (2 gráficas)
 st.subheader("📈 Relación entre R y r/R")
+
+# Crear dos columnas para las gráficas
+col_grafica1, col_grafica2 = st.columns(2)
+
 # Crear un rango de valores de R para el gráfico
 R_range = [i/100 for i in range(10, 251)]  # De 0.1 a 2.5 Å
 r_R_range = [radio_cation / R if R > 0 else 0 for R in R_range]
 
-fig, ax = plt.subplots()
-ax.plot(R_range, r_R_range, 'b-', linewidth=2, label='r/R')
-ax.axhline(y=relacion_r_R, color='r', linestyle='--', alpha=0.5, label=f'Valor actual ({relacion_r_R:.2f})')
-ax.axvline(x=radio_anion, color='g', linestyle='--', alpha=0.5, label=f'R actual ({radio_anion:.2f} Å)')
-
-# Añadir regiones sombreadas para los NC
+# Colores para las regiones de NC
 colors = ['#FFDDDD', '#DDEEDD', '#DDDDFF', '#F0E6DD', '#F5DDEC']
-for i in range(len(LIMITES_NC)):
-    y_min = 0 if i == 0 else LIMITES_NC[i-1]
-    y_max = LIMITES_NC[i]
-    ax.axhspan(y_min, y_max, alpha=0.2, color=colors[i], label=f'NC {NC_TIPICOS[i]}')
 
-ax.set_xlabel('Radio del Anión (R) [Å]')
-ax.set_ylabel('Relación r/R')
-ax.set_title(f'Variación de r/R para r = {radio_cation} Å constante')
-ax.legend(loc='upper right')
-ax.grid(alpha=0.3)
-st.pyplot(fig)
+# --- GRÁFICA 1: Vista completa (original) ---
+with col_grafica1:
+    st.markdown("**Vista completa**")
+    fig1, ax1 = plt.subplots()
+    ax1.plot(R_range, r_R_range, 'b-', linewidth=2, label='r/R')
+    ax1.axhline(y=relacion_r_R, color='r', linestyle='--', alpha=0.5, label=f'Valor actual ({relacion_r_R:.2f})')
+    ax1.axvline(x=radio_anion, color='g', linestyle='--', alpha=0.5, label=f'R actual ({radio_anion:.2f} Å)')
+    
+    # Añadir regiones sombreadas para los NC
+    for i in range(len(LIMITES_NC)):
+        y_min = 0 if i == 0 else LIMITES_NC[i-1]
+        y_max = LIMITES_NC[i]
+        ax1.axhspan(y_min, y_max, alpha=0.2, color=colors[i], label=f'NC {NC_TIPICOS[i]}')
+    
+    ax1.set_xlabel('Radio del Anión (R) [Å]')
+    ax1.set_ylabel('Relación r/R')
+    ax1.set_title(f'Variación de r/R para r = {radio_cation} Å constante')
+    ax1.legend(loc='upper right')
+    ax1.grid(alpha=0.3)
+    st.pyplot(fig1)
+
+# --- GRÁFICA 2: Vista de zoom (0 a 1.1 en eje Y) ---
+with col_grafica2:
+    st.markdown("**Vista de zoom (r/R: 0 a 1.1)**")
+    fig2, ax2 = plt.subplots()
+    ax2.plot(R_range, r_R_range, 'b-', linewidth=2, label='r/R')
+    ax2.axhline(y=relacion_r_R, color='r', linestyle='--', alpha=0.5, label=f'Valor actual ({relacion_r_R:.2f})')
+    ax2.axvline(x=radio_anion, color='g', linestyle='--', alpha=0.5, label=f'R actual ({radio_anion:.2f} Å)')
+    
+    # Añadir regiones sombreadas para los NC (mismo código)
+    for i in range(len(LIMITES_NC)):
+        y_min = 0 if i == 0 else LIMITES_NC[i-1]
+        y_max = LIMITES_NC[i]
+        ax2.axhspan(y_min, y_max, alpha=0.2, color=colors[i], label=f'NC {NC_TIPICOS[i]}')
+    
+    # CONFIGURACIÓN DEL ZOOM: Establecer límites del eje Y
+    ax2.set_ylim(0, 1.1)  # Esta es la línea clave para el zoom
+    
+    ax2.set_xlabel('Radio del Anión (R) [Å]')
+    ax2.set_ylabel('Relación r/R')
+    ax2.set_title(f'Zoom: r/R entre 0 y 1.1')
+    ax2.legend(loc='upper right')
+    ax2.grid(alpha=0.3)
+    st.pyplot(fig2)
 
 # 8. INFORMACIÓN CONTEXTUAL Y TEÓRICA
 with st.expander("📚 **Explicación Teórica y Consideraciones**"):
@@ -124,4 +157,5 @@ with st.expander("📚 **Explicación Teórica y Consideraciones**"):
     **Ejemplo clásico**: Para `r/R ≈ 0.55` (ej. NaCl), la app predice NC=6 (octaédrica), ¡que es correcta!
     """)
 
-st.caption("App desarrollada con fines académicos. Basado en las reglas de radios de Pauling.")
+# 9. PIE DE PÁGINA - MODIFICACIÓN SOLICITADA
+st.caption("App desarrollada con fines académicos por HV Martínez-Tejada. Basado en las reglas de radios de Pauling.")
