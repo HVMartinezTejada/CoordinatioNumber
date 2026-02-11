@@ -500,4 +500,5 @@ with st.expander("🎨 Guía de colores y explicación teórica"):
 # ============================================================
 # 13. PIE DE PÁGINA
 # ============================================================
-st.caption("App desarrollada con fines académicos por HV Martínez-Tejada. Basado en las reglas de radios de Pauling. Visualizaciones 3D con Py3Dmol.")
+st.caption("App desarrollada con fines académicos por HV Martínez-Tejada. Basado en las reglas de radios de Pauling. Visualizaciones 3D con py3Dmol.")
+
