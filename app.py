@@ -22,137 +22,118 @@ GEOMETRIAS = ["Triangular", "Tetraédrica", "Octaédrica", "Cúbica", "Cuboctaé
 colors = [cm.viridis(i / (len(NC_TIPICOS) - 1)) for i in range(len(NC_TIPICOS))]
 
 # ============================================================
-# 4. FUNCIONES PARA VISUALIZACIONES 3D CON PY3DMOL
+# 4. FUNCIONES AUXILIARES PARA VISUALIZACIONES 3D MEJORADAS
 # ============================================================
-def visualizar_nc3():
-    """Triangular planar (3 aniones en un plano, ángulos 120°)"""
-    vertices = [
-        [1.0, 0.0, 0.0],
-        [-0.5, np.sqrt(3)/2, 0.0],
-        [-0.5, -np.sqrt(3)/2, 0.0]
-    ]
-    view = py3Dmol.view(width=300, height=300)
-    # Aniones (rojo)
-    for v in vertices:
-        view.addSphere({'center': {'x': v[0], 'y': v[1], 'z': v[2]},
-                        'radius': 0.3, 'color': 'red', 'alpha': 0.9})
-    # Catión central (azul)
-    view.addSphere({'center': {'x': 0, 'y': 0, 'z': 0},
-                    'radius': 0.2, 'color': 'blue', 'alpha': 0.9})
-    # Enlaces (gris)
-    for v in vertices:
-        view.addCylinder({'start': {'x': 0, 'y': 0, 'z': 0},
-                          'end': {'x': v[0], 'y': v[1], 'z': v[2]},
-                          'radius': 0.05, 'color': 'gray'})
-    view.zoomTo()
-    return view
-
-def visualizar_nc4():
-    """Tetraedro"""
-    vertices = [
-        [1, 1, 1],
-        [1, -1, -1],
-        [-1, 1, -1],
-        [-1, -1, 1]
-    ]
-    # Normalizar a distancia 1
-    vertices = [[v[0]/3**0.5, v[1]/3**0.5, v[2]/3**0.5] for v in vertices]
-    view = py3Dmol.view(width=300, height=300)
-    for v in vertices:
-        view.addSphere({'center': {'x': v[0], 'y': v[1], 'z': v[2]},
-                        'radius': 0.3, 'color': 'red', 'alpha': 0.9})
-    view.addSphere({'center': {'x': 0, 'y': 0, 'z': 0},
-                    'radius': 0.2, 'color': 'blue', 'alpha': 0.9})
-    for v in vertices:
-        view.addCylinder({'start': {'x': 0, 'y': 0, 'z': 0},
-                          'end': {'x': v[0], 'y': v[1], 'z': v[2]},
-                          'radius': 0.05, 'color': 'gray'})
-    view.zoomTo()
-    return view
-
-def visualizar_nc6():
-    """Octaedro"""
-    vertices = [
-        [1, 0, 0], [-1, 0, 0],
-        [0, 1, 0], [0, -1, 0],
-        [0, 0, 1], [0, 0, -1]
-    ]
-    view = py3Dmol.view(width=300, height=300)
-    for v in vertices:
-        view.addSphere({'center': {'x': v[0], 'y': v[1], 'z': v[2]},
-                        'radius': 0.3, 'color': 'red', 'alpha': 0.9})
-    view.addSphere({'center': {'x': 0, 'y': 0, 'z': 0},
-                    'radius': 0.2, 'color': 'blue', 'alpha': 0.9})
-    for v in vertices:
-        view.addCylinder({'start': {'x': 0, 'y': 0, 'z': 0},
-                          'end': {'x': v[0], 'y': v[1], 'z': v[2]},
-                          'radius': 0.05, 'color': 'gray'})
-    view.zoomTo()
-    return view
-
-def visualizar_nc8():
-    """Cubo (8 aniones en vértices de cubo)"""
-    vertices = [
-        [1, 1, 1], [1, 1, -1], [1, -1, 1], [1, -1, -1],
-        [-1, 1, 1], [-1, 1, -1], [-1, -1, 1], [-1, -1, -1]
-    ]
-    # Normalizar a distancia 1
-    vertices = [[v[0]/3**0.5, v[1]/3**0.5, v[2]/3**0.5] for v in vertices]
-    view = py3Dmol.view(width=300, height=300)
-    for v in vertices:
-        view.addSphere({'center': {'x': v[0], 'y': v[1], 'z': v[2]},
-                        'radius': 0.3, 'color': 'red', 'alpha': 0.9})
-    view.addSphere({'center': {'x': 0, 'y': 0, 'z': 0},
-                    'radius': 0.2, 'color': 'blue', 'alpha': 0.9})
-    for v in vertices:
-        view.addCylinder({'start': {'x': 0, 'y': 0, 'z': 0},
-                          'end': {'x': v[0], 'y': v[1], 'z': v[2]},
-                          'radius': 0.05, 'color': 'gray'})
-    view.zoomTo()
-    return view
-
-def visualizar_nc12():
+def generar_visor(nc, vertices_norm, radio_anion, radio_cation, texto_etiqueta,
+                  ancho=400, alto=400):
     """
-    Cuboctaedro (12 aniones) - empaquetamiento compacto.
-    Coordenadas de un cuboctaedro de radio 1.
-    """
-    # Vértices de un cuboctaedro: permutaciones de (±1, ±1, 0) y ciclos
-    vertices = []
-    for i in range(3):
-        for s1 in [-1, 1]:
-            for s2 in [-1, 1]:
-                v = [0, 0, 0]
-                v[i] = s1
-                v[(i+1)%3] = s2
-                vertices.append(v[:])
-    # Normalizar a distancia 1 (ya están a distancia sqrt(2), ajustamos)
-    vertices = [[v[0]/2**0.5, v[1]/2**0.5, v[2]/2**0.5] for v in vertices]
+    Crea un visor py3Dmol independiente con la geometría de coordinación.
     
-    view = py3Dmol.view(width=300, height=300)
+    Parámetros:
+    - nc: número de coordinación (solo para referencia)
+    - vertices_norm: lista de coordenadas normalizadas (distancia 1 desde el centro)
+    - radio_anion: radio de la esfera del anión (se fija en 1.0 para consistencia)
+    - radio_cation: radio de la esfera del catión (según r/R típico)
+    - texto_etiqueta: texto que se mostrará en una etiqueta 3D
+    - ancho, alto: dimensiones del visor en píxeles
+    """
+    # Escalar las posiciones para que las esferas estén en contacto
+    distancia_centro = radio_anion + radio_cation
+    vertices = [[v * distancia_centro for v in pos] for pos in vertices_norm]
+    
+    view = py3Dmol.view(width=ancho, height=alto)
+    
+    # ---- Aniones (rojo, semitransparente) ----
     for v in vertices:
-        view.addSphere({'center': {'x': v[0], 'y': v[1], 'z': v[2]},
-                        'radius': 0.25, 'color': 'red', 'alpha': 0.9})
-    view.addSphere({'center': {'x': 0, 'y': 0, 'z': 0},
-                    'radius': 0.2, 'color': 'blue', 'alpha': 0.9})
-    # Enlaces (opcional, muchos enlaces, solo algunos representativos)
-    for v in vertices[:6]:  # solo algunos para no saturar
-        view.addCylinder({'start': {'x': 0, 'y': 0, 'z': 0},
-                          'end': {'x': v[0], 'y': v[1], 'z': v[2]},
-                          'radius': 0.05, 'color': 'gray'})
+        view.addSphere({
+            'center': {'x': v[0], 'y': v[1], 'z': v[2]},
+            'radius': radio_anion,
+            'color': 'red',
+            'alpha': 0.8,
+            'wireframe': False
+        })
+    
+    # ---- Catión central (azul) ----
+    view.addSphere({
+        'center': {'x': 0, 'y': 0, 'z': 0},
+        'radius': radio_cation,
+        'color': 'blue',
+        'alpha': 1.0,
+        'wireframe': False
+    })
+    
+    # ---- Enlaces (cilindros grises) - solo algunos para no saturar ----
+    for v in vertices[:6] if nc == 12 else vertices:
+        view.addCylinder({
+            'start': {'x': 0, 'y': 0, 'z': 0},
+            'end': {'x': v[0], 'y': v[1], 'z': v[2]},
+            'radius': 0.05,
+            'color': 'gray'
+        })
+    
+    # ---- Etiqueta flotante con información ----
+    max_z = max([p[2] for p in vertices] + [0])
+    view.addLabel(texto_etiqueta, {
+        'position': {'x': 0, 'y': 0, 'z': max_z + 2.0},
+        'fontSize': 16,
+        'fontColor': 'black',
+        'backgroundColor': 'white',
+        'backgroundOpacity': 0.8,
+        'inFront': True
+    })
+    
+    # ---- Ajuste de cámara centrado ----
+    view.setView({
+        'fov': 35,
+        'position': [0, 0, distancia_centro * 3.0],
+        'up': [0, 1, 0]
+    })
     view.zoomTo()
     return view
 
-# Diccionario de funciones de visualización
-visualizadores = {
-    3: visualizar_nc3,
-    4: visualizar_nc4,
-    6: visualizar_nc6,
-    8: visualizar_nc8,
-    12: visualizar_nc12
-}
+# ============================================================
+# 5. DEFINICIÓN DE VÉRTICES NORMALIZADOS (distancia = 1)
+# ============================================================
+# (Se conservan los mismos vectores que usabas, ya normalizados)
+VERTICES_NC3 = [
+    [1.0, 0.0, 0.0],
+    [-0.5, np.sqrt(3)/2, 0.0],
+    [-0.5, -np.sqrt(3)/2, 0.0]
+]
+
+VERTICES_NC4 = [
+    [1, 1, 1],
+    [1, -1, -1],
+    [-1, 1, -1],
+    [-1, -1, 1]
+]
+# Normalizar a distancia 1
+VERTICES_NC4 = [[v[0]/3**0.5, v[1]/3**0.5, v[2]/3**0.5] for v in VERTICES_NC4]
+
+VERTICES_NC6 = [
+    [1, 0, 0], [-1, 0, 0],
+    [0, 1, 0], [0, -1, 0],
+    [0, 0, 1], [0, 0, -1]
+]
+
+VERTICES_NC8 = [
+    [1, 1, 1], [1, 1, -1], [1, -1, 1], [1, -1, -1],
+    [-1, 1, 1], [-1, 1, -1], [-1, -1, 1], [-1, -1, -1]
+]
+VERTICES_NC8 = [[v[0]/3**0.5, v[1]/3**0.5, v[2]/3**0.5] for v in VERTICES_NC8]
+
+VERTICES_NC12 = []
+for i in range(3):
+    for s1 in [-1, 1]:
+        for s2 in [-1, 1]:
+            v = [0, 0, 0]
+            v[i] = s1
+            v[(i+1)%3] = s2
+            VERTICES_NC12.append(v[:])
+VERTICES_NC12 = [[v[0]/2**0.5, v[1]/2**0.5, v[2]/2**0.5] for v in VERTICES_NC12]
 
 # ============================================================
-# 5. INTERFAZ DE USUARIO (Sidebar)
+# 6. INTERFAZ DE USUARIO (Sidebar)
 # ============================================================
 with st.sidebar:
     st.header("⚙️ Controles de los Radios Iónicos")
@@ -188,7 +169,7 @@ with st.sidebar:
         st.rerun()
 
 # ============================================================
-# 6. CÁLCULO PRINCIPAL
+# 7. CÁLCULO PRINCIPAL
 # ============================================================
 relacion_r_R = radio_cation / radio_anion if radio_anion > 0 else 0
 
@@ -202,7 +183,7 @@ for i, limite in enumerate(LIMITES_NC):
         break
 
 # ============================================================
-# 7. VISUALIZACIÓN DE RESULTADOS (métricas)
+# 8. VISUALIZACIÓN DE RESULTADOS (métricas)
 # ============================================================
 col1, col2, col3 = st.columns(3)
 with col1:
@@ -213,7 +194,7 @@ with col3:
     st.metric(label="Geometría", value=geometria_predicha)
 
 # ============================================================
-# 8. BARRA DE PROGRESO Y TABLA DE LÍMITES
+# 9. BARRA DE PROGRESO Y TABLA DE LÍMITES
 # ============================================================
 st.subheader("📊 Umbrales de Estabilidad para cada NC")
 df_limites = pd.DataFrame({
@@ -231,7 +212,7 @@ marcadores = " | ".join([f"{limite:.3f} (NC={nc})" for limite, nc in zip(LIMITES
 st.caption(f"**Límites:** {marcadores}")
 
 # ============================================================
-# 9. GRÁFICOS INTERACTIVOS (dos columnas)
+# 10. GRÁFICOS INTERACTIVOS (dos columnas)
 # ============================================================
 st.subheader("📈 Relación entre R y r/R")
 
@@ -345,40 +326,124 @@ with col_grafica2:
     st.pyplot(fig2)
 
 # ============================================================
-# 10. VISUALIZACIONES 3D (PY3DMOL) - NUEVA SECCIÓN
+# 11. VISUALIZACIONES 3D - NUEVA ORGANIZACIÓN (3x2)
 # ============================================================
 st.subheader("🧊 Geometrías de coordinación en 3D")
-st.markdown("Cada columna muestra un poliedro de coordinación. **Los aniones son esferas rojas, el catión central es azul**. Puedes rotar y hacer zoom con el mouse.")
+st.markdown("""
+Cada visor muestra un poliedro de coordinación con **aniones rojos** y **catión azul central**.  
+Los tamaños relativos corresponden a los valores típicos de r/R dentro de cada intervalo.  
+Puedes rotar, desplazar y hacer zoom con el mouse.
+""")
 
-# Crear 5 columnas (una por cada NC)
-cols_viz = st.columns(5)
+# Parámetros fijos para las visualizaciones (anión = 1.0 Å)
+R_ANION_FIJO = 1.0
 
-for i, nc in enumerate(NC_TIPICOS):
-    with cols_viz[i]:
-        # Resaltar el NC actual con un borde dorado
-        if nc == nc_predicho:
-            st.markdown('<div style="border: 3px solid gold; padding: 5px; border-radius: 10px;">', unsafe_allow_html=True)
-        
-        st.markdown(f"**NC = {nc}**")
-        st.markdown(f"*{GEOMETRIAS[i]}*")
-        
-        # Generar visualización con Py3Dmol
-        view = visualizadores[nc]()
-        view_html = view._make_html()
-        st.components.v1.html(view_html, width=320, height=320)
-        
-        # Mostrar el intervalo de r/R
-        if i == 0:
-            intervalo = f"0.155 – 0.225"
-        else:
-            intervalo = f"{LIMITES_NC[i-1]:.3f} – {LIMITES_NC[i]:.3f}"
-        st.caption(f"r/R: {intervalo}")
-        
-        if nc == nc_predicho:
-            st.markdown('</div>', unsafe_allow_html=True)
+# Valores representativos de r/R dentro de cada intervalo
+r_R_representativo = {
+    3: 0.19,
+    4: 0.19,
+    6: 0.30,
+    8: 0.60,
+    12: 0.80
+}
+
+# Generar los visores para cada NC
+visores = {}
+for nc in NC_TIPICOS:
+    r_cat = r_R_representativo[nc] * R_ANION_FIJO
+    intervalo = f"0.155–0.225" if nc == 3 else f"{LIMITES_NC[NC_TIPICOS.index(nc)-1]:.3f}–{LIMITES_NC[NC_TIPICOS.index(nc)]:.3f}"
+    if nc == 12:
+        intervalo = ">0.732"
+    etiqueta = f"NC = {nc}\n{GEOMETRIAS[NC_TIPICOS.index(nc)]}\nr/R: {intervalo}"
+    
+    # Seleccionar vértices según NC
+    if nc == 3:
+        vertices = VERTICES_NC3
+    elif nc == 4:
+        vertices = VERTICES_NC4
+    elif nc == 6:
+        vertices = VERTICES_NC6
+    elif nc == 8:
+        vertices = VERTICES_NC8
+    elif nc == 12:
+        vertices = VERTICES_NC12
+    
+    visor = generar_visor(nc, vertices, R_ANION_FIJO, r_cat, etiqueta,
+                          ancho=400, alto=400)
+    visores[nc] = visor._repr_html_()
+
+# ---- DISPOSICIÓN EN CUADRÍCULA 3 FILAS x 2 COLUMNAS ----
+
+# Fila 1: NC = 3 y NC = 4
+col1, col2 = st.columns(2)
+with col1:
+    st.markdown('<div style="border: 3px solid gold; padding: 5px; border-radius: 10px;" '
+                'if 3 == nc_predicho else "">', unsafe_allow_html=True)
+    st.markdown("**NC = 3**  ·  *Triangular*")
+    st.components.v1.html(visores[3], height=450)
+    st.caption("r/R: 0.155 – 0.225")
+    if 3 == nc_predicho:
+        st.markdown('</div>', unsafe_allow_html=True)
+
+with col2:
+    if 4 == nc_predicho:
+        st.markdown('<div style="border: 3px solid gold; padding: 5px; border-radius: 10px;">', unsafe_allow_html=True)
+    st.markdown("**NC = 4**  ·  *Tetraédrica*")
+    st.components.v1.html(visores[4], height=450)
+    st.caption("r/R: 0.155 – 0.225")
+    if 4 == nc_predicho:
+        st.markdown('</div>', unsafe_allow_html=True)
+
+# Fila 2: NC = 6 y NC = 8
+col1, col2 = st.columns(2)
+with col1:
+    if 6 == nc_predicho:
+        st.markdown('<div style="border: 3px solid gold; padding: 5px; border-radius: 10px;">', unsafe_allow_html=True)
+    st.markdown("**NC = 6**  ·  *Octaédrica*")
+    st.components.v1.html(visores[6], height=450)
+    st.caption("r/R: 0.225 – 0.414")
+    if 6 == nc_predicho:
+        st.markdown('</div>', unsafe_allow_html=True)
+
+with col2:
+    if 8 == nc_predicho:
+        st.markdown('<div style="border: 3px solid gold; padding: 5px; border-radius: 10px;">', unsafe_allow_html=True)
+    st.markdown("**NC = 8**  ·  *Cúbica*")
+    st.components.v1.html(visores[8], height=450)
+    st.caption("r/R: 0.414 – 0.732")
+    if 8 == nc_predicho:
+        st.markdown('</div>', unsafe_allow_html=True)
+
+# Fila 3: NC = 12 y Leyenda
+col1, col2 = st.columns(2)
+with col1:
+    if 12 == nc_predicho:
+        st.markdown('<div style="border: 3px solid gold; padding: 5px; border-radius: 10px;">', unsafe_allow_html=True)
+    st.markdown("**NC = 12**  ·  *Cuboctaédrica (Compacta)*")
+    st.components.v1.html(visores[12], height=450)
+    st.caption("r/R: > 0.732")
+    if 12 == nc_predicho:
+        st.markdown('</div>', unsafe_allow_html=True)
+
+with col2:
+    # Celda de leyenda (vacía de estructura)
+    st.markdown("""
+    <div style="background-color: #f0f2f6; padding: 20px; border-radius: 10px; height: 450px; display: flex; flex-direction: column; justify-content: center;">
+        <h4 style="text-align: center;">📘 Información</h4>
+        <p style="text-align: center;">
+        <span style="color:blue;">● Catión (central)</span><br>
+        <span style="color:red;">● Aniones (coordinados)</span><br><br>
+        <strong>Radios fijos para visualización:</strong><br>
+        Anión (R) = 1.0 Å<br>
+        Catión (r) = r/R × 1.0 Å<br>
+        (valores representativos del intervalo)<br><br>
+        <em>El visor NC=12 muestra solo 6 enlaces<br>para no saturar la escena.</em>
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 
 # ============================================================
-# 11. LEYENDA DE COLORES Y EXPLICACIÓN TEÓRICA
+# 12. LEYENDA DE COLORES Y EXPLICACIÓN TEÓRICA
 # ============================================================
 with st.expander("🎨 Guía de colores y explicación teórica"):
     col_col1, col_col2, col_col3, col_col4, col_col5 = st.columns(5)
@@ -433,8 +498,6 @@ with st.expander("🎨 Guía de colores y explicación teórica"):
     """)
 
 # ============================================================
-# 12. PIE DE PÁGINA
+# 13. PIE DE PÁGINA
 # ============================================================
 st.caption("App desarrollada con fines académicos por HV Martínez-Tejada. Basado en las reglas de radios de Pauling. Visualizaciones 3D con Py3Dmol.")
-
-
