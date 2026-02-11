@@ -36,6 +36,24 @@ with st.sidebar:
         min_value=0.1, max_value=7.0, value=1.4, step=0.01,
         help="Varía este control para simular aniones de diferente tamaño. Observa cómo cambia r/R y el NC."
     )
+    
+    st.divider()
+    st.header("🔍 Ajustes de zoom vertical (gráfica derecha)")
+    y_max_zoom = st.slider(
+        "Límite superior del eje Y",
+        min_value=0.2, max_value=2.0, value=1.1, step=0.05,
+        help="Selecciona el valor máximo del eje Y. Valores más bajos amplían la región inferior."
+    )
+    y_min_zoom = st.slider(
+        "Límite inferior del eje Y",
+        min_value=0.0, max_value=0.5, value=0.0, step=0.05,
+        help="Selecciona el valor mínimo del eje Y (generalmente 0)."
+    )
+    # Botón para restablecer valores por defecto
+    if st.button("🔄 Restablecer zoom vertical"):
+        y_max_zoom = 1.1
+        y_min_zoom = 0.0
+        st.rerun()
 
 # 5. CÁLCULO PRINCIPAL
 relacion_r_R = radio_cation / radio_anion if radio_anion > 0 else 0
@@ -116,12 +134,12 @@ with col_grafica1:
     ax1.grid(alpha=0.3)
     st.pyplot(fig1)
 
-# --- GRÁFICA 2: Vista de zoom dinámico + transición 2D/3D (MEJORADA) ---
+# --- GRÁFICA 2: Vista de zoom dinámico + transición 2D/3D (con ajuste Y) ---
 with col_grafica2:
     st.markdown("**Vista de zoom – análisis detallado (gráfica principal)**")
     
     # Límites dinámicos para el eje X alrededor de R actual
-    margen = 1.0  # margen en Å a cada lado
+    margen = 1.0
     x_min = max(0.1, radio_anion - margen)
     x_max = radio_anion + margen
     
@@ -148,23 +166,20 @@ with col_grafica2:
     # ------------------------------------------------------------------
     # 🟣 TRANSICIÓN 2D → 3D (LÍMITE r/R = 0.225)
     # ------------------------------------------------------------------
-    R_transicion = radio_cation / 0.225  # R crítico para transición
-    
-    # Línea vertical púrpura (si está dentro del rango X)
+    R_transicion = radio_cation / 0.225
     if x_min <= R_transicion <= x_max:
         ax2.axvline(x=R_transicion, color='purple', linestyle='-.', linewidth=1.8, alpha=0.9,
                     label=f'Transición 2D/3D (R={R_transicion:.2f} Å)')
-    
-    # Línea horizontal púrpura (límite teórico)
     ax2.axhline(y=0.225, color='purple', linestyle='-.', linewidth=1.8, alpha=0.9,
                 label='Límite 2D/3D (r/R = 0.225)')
     
-    # 🌫️🌫️ REGIÓN 2D (NC=3) - TRAMA DE RAYAS para máxima distinción
+    # 🌫️🌫️ REGIÓN 2D (NC=3) - TRAMA DE RAYAS
     ax2.axhspan(0.155, 0.225, alpha=0.4, color='#555555', hatch='///', label='Región 2D (NC=3, planar)')
     
-    # 🏷️ Etiqueta "2D" dentro de la región
-    ax2.text(x_min + 0.1, 0.19, '2D', fontsize=11, weight='bold', color='white',
-             bbox=dict(boxstyle='round', facecolor='#555555', alpha=0.8))
+    # 🏷️ Etiqueta "2D" (solo si está dentro del rango Y visible)
+    if y_max_zoom > 0.19:
+        ax2.text(x_min + 0.1, 0.19, '2D', fontsize=11, weight='bold', color='white',
+                 bbox=dict(boxstyle='round', facecolor='#555555', alpha=0.8))
     
     # ------------------------------------------------------------------
     # Regiones 3D (NC ≥ 4) - VIRIDIS con alpha aumentado
@@ -174,9 +189,10 @@ with col_grafica2:
         y_max = LIMITES_NC[i]
         ax2.axhspan(y_min, y_max, alpha=0.35, color=colors[i], label=f'NC {NC_TIPICOS[i]}')
     
-    # 🏷️ Etiqueta "3D" dentro de la primera región 3D (NC=4)
-    ax2.text(x_min + 0.1, 0.30, '3D', fontsize=11, weight='bold', color='white',
-             bbox=dict(boxstyle='round', facecolor=colors[1], alpha=0.8))
+    # 🏷️ Etiqueta "3D" (solo si está dentro del rango Y visible)
+    if y_max_zoom > 0.30:
+        ax2.text(x_min + 0.1, 0.30, '3D', fontsize=11, weight='bold', color='white',
+                 bbox=dict(boxstyle='round', facecolor=colors[1], alpha=0.8))
     
     # ------------------------------------------------------------------
     # LÍNEAS DIVISORIAS EXPLÍCITAS entre NC=3 y NC=4
@@ -184,18 +200,21 @@ with col_grafica2:
     ax2.axhline(y=0.155, color='black', linestyle='-', linewidth=1.0, alpha=0.5)
     ax2.axhline(y=0.225, color='black', linestyle='-', linewidth=1.0, alpha=0.5)
     
-    # Etiquetas de los límites
-    ax2.text(x_max - 0.05, 0.155, 'NC=3', fontsize=8, color='black',
-             verticalalignment='bottom', horizontalalignment='right')
-    ax2.text(x_max - 0.05, 0.225, 'NC=4', fontsize=8, color='black',
-             verticalalignment='bottom', horizontalalignment='right')
+    # Etiquetas de los límites (si están en el rango Y)
+    if y_max_zoom > 0.155:
+        ax2.text(x_max - 0.05, 0.155, 'NC=3', fontsize=8, color='black',
+                 verticalalignment='bottom', horizontalalignment='right')
+    if y_max_zoom > 0.225:
+        ax2.text(x_max - 0.05, 0.225, 'NC=4', fontsize=8, color='black',
+                 verticalalignment='bottom', horizontalalignment='right')
     
     # Líneas auxiliares para otros NC (gris punteado)
-    for limite in LIMITES_NC[2:]:  # 0.414, 0.732, 1.000
-        ax2.axhline(y=limite, color='gray', linestyle=':', alpha=0.4, linewidth=0.8)
+    for limite in LIMITES_NC[2:]:
+        if limite <= y_max_zoom:  # solo dibujar si está dentro del rango
+            ax2.axhline(y=limite, color='gray', linestyle=':', alpha=0.4, linewidth=0.8)
     
-    # Configuración de ejes
-    ax2.set_ylim(0, 1.1)
+    # Configuración de ejes con los valores seleccionados por el usuario
+    ax2.set_ylim(y_min_zoom, y_max_zoom)
     ax2.set_xlim(x_min, x_max)
     ax2.set_xlabel('Radio del Anión (R) [Å]', fontsize=12)
     ax2.set_ylabel('Relación r/R', fontsize=12)
@@ -204,11 +223,11 @@ with col_grafica2:
     ax2.grid(alpha=0.3)
     st.pyplot(fig2)
 
-# 9. LEYENDA EXPLICATIVA DE COLORES (actualizada con trama para NC=3)
+# 9. LEYENDA EXPLICATIVA DE COLORES
 with st.expander("🎨 Guía de colores para los Números de Coordinación"):
     col_col1, col_col2, col_col3, col_col4, col_col5 = st.columns(5)
     
-    # NC=3 con trama de rayas (gris oscuro)
+    # NC=3 con trama de rayas
     with col_col1:
         st.markdown(
             '<div style="background-color: #555555; background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.2) 0px, rgba(255,255,255,0.2) 5px, transparent 5px, transparent 10px); '
@@ -249,10 +268,9 @@ with st.expander("🎨 Guía de colores para los Números de Coordinación"):
     st.markdown("""
     **Explicación de la paleta de colores (vista de zoom):**
     - **Gris con rayas diagonales**: región 2D (NC=3, geometría triangular, planar).  
-      El rayado la diferencia claramente de las regiones 3D.
     - **Viridis (verde-azul)**: regiones 3D (NC≥4). La intensidad del color aumenta con el NC.
-    - **Líneas púrpura**: marcan el límite teórico \( r/R = 0.225 \) y el valor de \( R \) correspondiente para el catión seleccionado.
-    - **Líneas negras sólidas** en \( r/R = 0.155 \) y \( 0.225 \): división explícita entre NC=3 y NC=4.
+    - **Líneas púrpura**: marcan el límite teórico \( r/R = 0.225 \) y el valor de \( R \) correspondiente.
+    - **Líneas negras sólidas**: división explícita entre NC=3 y NC=4.
     """)
 
 # 10. INFORMACIÓN CONTEXTUAL Y TEÓRICA
@@ -260,21 +278,16 @@ with st.expander("📚 **Explicación Teórica y Consideraciones**"):
     st.markdown("""
     **Fundamento del modelo**
     - Los **límites** mostrados (0.155, 0.225, 0.414, 0.732) son **umbrales geométricos** derivados de asumir iones como esferas rígidas en contacto.
-    - Cada límite inferior representa la **relación mínima** `r/R` a la que el catión puede tocar a todos los aniones que lo rodean en esa geometría.
     
     **Interpretación de la transición 2D → 3D**
     - El valor **`r/R = 0.225`** es el límite inferior para la coordinación tetraédrica (3D) y el superior para la triangular (2D).
     - Para un catión de radio `r` fijo, el tamaño de anión que produce esta transición es **\( R = r / 0.225 \)**.
-    - En la gráfica de zoom, la **intersección de las líneas púrpura** indica este punto crítico.  
-      → A la **derecha** de la línea vertical (R mayor) se encuentra la **región 2D** (NC=3).  
-      → A la **izquierda** (R menor) se encuentran las **regiones 3D** (NC≥4).
+    - En la gráfica de zoom, puedes **ajustar el límite superior del eje Y** para ampliar la región inferior y observar con claridad las franjas de NC=3 y NC=4.
     
-    **Limitaciones importantes del modelo simplificado**
-    1.  **Iones no esféricos**: Los iones reales pueden polarizarse (deformarse).
-    2.  **Carácter covalente**: El enlace químico puede tener direccionalidad, invalidando la predicción puramente geométrica.
-    3.  **Factores energéticos**: La estabilidad real depende de la energía total de red, no solo del contacto geométrico.
-    
-    **Ejemplo clásico**: Para `r/R ≈ 0.55` (ej. NaCl), la app predice NC=6 (octaédrica), ¡que es correcta!
+    **Limitaciones importantes**
+    1.  **Iones no esféricos**: Los iones reales pueden polarizarse.
+    2.  **Carácter covalente**: El enlace químico puede tener direccionalidad.
+    3.  **Factores energéticos**: La estabilidad real depende de la energía total de red.
     """)
 
 # 11. PIE DE PÁGINA
