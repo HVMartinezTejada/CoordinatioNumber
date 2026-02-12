@@ -376,7 +376,7 @@ for nc in NC_TIPICOS:
     
     visor = generar_visor(nc, vertices, R_ANION_FIJO, r_cat, etiqueta,
                           ancho=450, alto=450)
-    visores[nc] = visor._repr_html_()   # <--- ¡IMPORTANTE!
+    visores[nc] = visor._make_html()   # <--- ¡IMPORTANTE!
 
 # ---- DISPOSICIÓN EN CUADRÍCULA 3 FILAS x 2 COLUMNAS ----
 
@@ -501,4 +501,5 @@ with st.expander("🎨 Guía de colores y explicación teórica"):
 # 12. PIE DE PÁGINA
 # ============================================================
 st.caption("App desarrollada con fines académicos por HV Martínez-Tejada. Basado en las reglas de radios de Pauling. Visualizaciones 3D con Py3Dmol.")
+
 
