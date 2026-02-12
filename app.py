@@ -326,9 +326,7 @@ with col_grafica2:
 # ============================================================
 # 10. VISUALIZACIONES 3D - GENERACIÓN CON PARCHE COMPLETO
 # ============================================================
-# ============================================================
-# 10. VISUALIZACIONES 3D - GENERACIÓN CON PARCHE TOTAL
-# ============================================================
+
 st.subheader("🧊 Geometrías de coordinación en 3D")
 st.markdown("""
 Cada visor muestra un poliedro de coordinación con **aniones rojos** y **catión azul central**.  
@@ -336,9 +334,42 @@ Los tamaños relativos corresponden a los valores típicos de r/R dentro de cada
 Puedes rotar, desplazar y hacer zoom con el mouse.
 """)
 
-R_ANION_FIJO = 1.0
+# ------------------------------------------------------------
+# 🔥 CARGA GLOBAL DE 3DMOL.JS CON REINTENTO
+# ------------------------------------------------------------
+st.markdown("""
+<script>
+    (function load3Dmol() {
+        if (typeof $3Dmol !== 'undefined') {
+            console.log('✅ 3Dmol.js ya está cargado');
+            return;
+        }
+        console.log('⏳ Cargando 3Dmol.js desde cdnjs...');
+        var script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/3Dmol/1.6.0/3Dmol.js';
+        script.onload = function() {
+            console.log('✅ 3Dmol.js cargado correctamente');
+            window.$3Dmol = window.$3Dmol || $3Dmol;
+        };
+        script.onerror = function() {
+            console.error('❌ Error al cargar 3Dmol.js desde cdnjs, reintentando con jsDelivr...');
+            var script2 = document.createElement('script');
+            script2.src = 'https://cdn.jsdelivr.net/npm/3dmol@1.6.0/build/3Dmol.js';
+            script2.onload = function() {
+                console.log('✅ 3Dmol.js cargado desde jsDelivr');
+                window.$3Dmol = window.$3Dmol || $3Dmol;
+            };
+            document.head.appendChild(script2);
+        };
+        document.head.appendChild(script);
+    })();
+</script>
+""", unsafe_allow_html=True)
 
-# Radios representativos (corregidos)
+# ------------------------------------------------------------
+# PARÁMETROS FIJOS
+# ------------------------------------------------------------
+R_ANION_FIJO = 1.0
 r_R_representativo = {
     3: 0.19,
     4: 0.30,
@@ -352,7 +383,7 @@ visores = {}
 for nc in NC_TIPICOS:
     r_cat = r_R_representativo[nc] * R_ANION_FIJO
     idx = NC_TIPICOS.index(nc)
-    
+
     # Texto del intervalo
     if nc == 3:
         intervalo = "0.155–0.225"
@@ -360,10 +391,10 @@ for nc in NC_TIPICOS:
         intervalo = ">0.732"
     else:
         intervalo = f"{LIMITES_NC[idx-1]:.3f}–{LIMITES_NC[idx]:.3f}"
-    
+
     etiqueta = f"NC = {nc}\n{GEOMETRIAS[idx]}\nr/R: {intervalo}"
-    
-    # Selección de vértices
+
+    # Vértices según NC
     if nc == 3:
         vertices = VERTICES_NC3
     elif nc == 4:
@@ -374,32 +405,128 @@ for nc in NC_TIPICOS:
         vertices = VERTICES_NC8
     elif nc == 12:
         vertices = VERTICES_NC12
+
+    # 🔥 GENERAR VISOR SIN INCLUIR SCRIPT (usamos el global)
+    view = py3Dmol.view(width=450, height=450, linked=False, viewergrid=(1,1), excludeScript=True)
     
-    visor = generar_visor(nc, vertices, R_ANION_FIJO, r_cat, etiqueta,
-                          ancho=450, alto=450)
+    # Configurar escena (igual que antes)
+    distancia_centro = R_ANION_FIJO + r_cat
+    vertices_escalados = [[v * distancia_centro for v in pos] for pos in vertices]
     
-    html = visor._make_html()
+    for v in vertices_escalados:
+        view.addSphere({
+            'center': {'x': v[0], 'y': v[1], 'z': v[2]},
+            'radius': R_ANION_FIJO,
+            'color': 'red',
+            'alpha': 0.8,
+            'wireframe': False
+        })
     
-    # --------------------------------------------------------
-    # 🚀 PARCHE DEFINITIVO (reemplaza TODAS las ocurrencias)
-    # --------------------------------------------------------
-    # 1. Reemplazar TODAS las ocurrencias de '3dmolviewer_' + dígitos por 'viewer_' + dígitos
-    html = re.sub(r'3dmolviewer_(\d+)', r'viewer_\1', html)
+    view.addSphere({
+        'center': {'x': 0, 'y': 0, 'z': 0},
+        'radius': r_cat,
+        'color': 'blue',
+        'alpha': 1.0,
+        'wireframe': False
+    })
     
-    # 2. Usar CDN confiable (jsDelivr)
-    html = html.replace(
-        "https://3dmol.org/build/3Dmol.js",
-        "https://cdn.jsdelivr.net/npm/3dmol@1.6.0/build/3Dmol.js"
-    )
+    enlaces_mostrar = vertices_escalados[:6] if nc == 12 else vertices_escalados
+    for v in enlaces_mostrar:
+        view.addCylinder({
+            'start': {'x': 0, 'y': 0, 'z': 0},
+            'end': {'x': v[0], 'y': v[1], 'z': v[2]},
+            'radius': 0.05,
+            'color': 'gray'
+        })
     
-    # 3. Eliminar script molesto de detección de JupyterLab
-    html = re.sub(
-        r'<script[\s\S]*?You appear to be running in JupyterLab[\s\S]*?</script>',
-        '',
-        html
-    )
+    max_z = max([p[2] for p in vertices_escalados] + [0])
+    view.addLabel(etiqueta, {
+        'position': {'x': 0, 'y': 0, 'z': max_z + 2.2},
+        'fontSize': 16,
+        'fontColor': 'black',
+        'backgroundColor': 'white',
+        'backgroundOpacity': 0.8,
+        'inFront': True
+    })
+    
+    view.setView({
+        'fov': 35,
+        'position': [0, 0, distancia_centro * 3.5],
+        'up': [0, 1, 0]
+    })
+    view.zoomTo()
+
+    # 🔥 OBTENER HTML Y PARCHEAR IDs (GLOBAL)
+    html = view._make_html()
+    html = re.sub(r'3dmolviewer_(\d+)', r'viewer_\1', html)  # ¡CAMBIOS EN TODAS PARTES!
     
     visores[nc] = html
+
+# ------------------------------------------------------------
+# CUADRÍCULA 3x2 - USANDO st.components.v1.html (MÁS ROBUSTO)
+# ------------------------------------------------------------
+
+# Fila 1: NC=3 y NC=4
+col1, col2 = st.columns(2)
+with col1:
+    if 3 == nc_predicho:
+        st.markdown('<div style="border: 3px solid gold; padding: 5px; border-radius: 10px;">', unsafe_allow_html=True)
+    st.markdown("**NC = 3**  ·  *Triangular*")
+    st.components.v1.html(visores[3], height=450)   # 🟢 iframe
+    if 3 == nc_predicho:
+        st.markdown('</div>', unsafe_allow_html=True)
+
+with col2:
+    if 4 == nc_predicho:
+        st.markdown('<div style="border: 3px solid gold; padding: 5px; border-radius: 10px;">', unsafe_allow_html=True)
+    st.markdown("**NC = 4**  ·  *Tetraédrica*")
+    st.components.v1.html(visores[4], height=450)
+    if 4 == nc_predicho:
+        st.markdown('</div>', unsafe_allow_html=True)
+
+# Fila 2: NC=6 y NC=8
+col1, col2 = st.columns(2)
+with col1:
+    if 6 == nc_predicho:
+        st.markdown('<div style="border: 3px solid gold; padding: 5px; border-radius: 10px;">', unsafe_allow_html=True)
+    st.markdown("**NC = 6**  ·  *Octaédrica*")
+    st.components.v1.html(visores[6], height=450)
+    if 6 == nc_predicho:
+        st.markdown('</div>', unsafe_allow_html=True)
+
+with col2:
+    if 8 == nc_predicho:
+        st.markdown('<div style="border: 3px solid gold; padding: 5px; border-radius: 10px;">', unsafe_allow_html=True)
+    st.markdown("**NC = 8**  ·  *Cúbica*")
+    st.components.v1.html(visores[8], height=450)
+    if 8 == nc_predicho:
+        st.markdown('</div>', unsafe_allow_html=True)
+
+# Fila 3: NC=12 y leyenda
+col1, col2 = st.columns(2)
+with col1:
+    if 12 == nc_predicho:
+        st.markdown('<div style="border: 3px solid gold; padding: 5px; border-radius: 10px;">', unsafe_allow_html=True)
+    st.markdown("**NC = 12**  ·  *Cuboctaédrica (Compacta)*")
+    st.components.v1.html(visores[12], height=450)
+    if 12 == nc_predicho:
+        st.markdown('</div>', unsafe_allow_html=True)
+
+with col2:
+    st.markdown("""
+    <div style="background-color: #f0f2f6; padding: 20px; border-radius: 10px; height: 450px; display: flex; flex-direction: column; justify-content: center;">
+        <h4 style="text-align: center;">📘 Información</h4>
+        <p style="text-align: center;">
+        <span style="color:blue;">● Catión (central)</span><br>
+        <span style="color:red;">● Aniones (coordinados)</span><br><br>
+        <strong>Radios fijos para visualización:</strong><br>
+        Anión (R) = 1.0 Å<br>
+        Catión (r) = r/R × 1.0 Å<br>
+        (valores representativos del intervalo)<br><br>
+        <em>El visor NC=12 muestra solo 6 enlaces<br>para no saturar la escena.</em>
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
     
 # ============================================================
 # 11. DISPOSICIÓN EN CUADRÍCULA 3x2 (CON ÍNDICES CORREGIDOS)
@@ -526,4 +653,5 @@ with st.expander("🎨 Guía de colores y explicación teórica"):
 # 13. PIE DE PÁGINA
 # ============================================================
 st.caption("App desarrollada con fines académicos por HV Martínez-Tejada. Basado en las reglas de radios de Pauling. Visualizaciones 3D con Py3Dmol.")
+
 
