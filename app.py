@@ -327,8 +327,8 @@ with col_grafica2:
 # ============================================================
 # 10. VISUALIZACIONES 3D - ORGANIZACIÓN EN CUADRÍCULA 3x2
 # ============================================================
-st.markdown("### 🧪 Visor de prueba (NC=6)")
-st.components.v1.html(visores[6], height=450)
+# st.markdown("### 🧪 Visor de prueba (NC=6)")
+# st.components.v1.html(visores[6], height=450)
 
 st.subheader("🧊 Geometrías de coordinación en 3D")
 st.markdown("""
@@ -504,6 +504,7 @@ with st.expander("🎨 Guía de colores y explicación teórica"):
 # 12. PIE DE PÁGINA
 # ============================================================
 st.caption("App desarrollada con fines académicos por HV Martínez-Tejada. Basado en las reglas de radios de Pauling. Visualizaciones 3D con Py3Dmol.")
+
 
 
 
