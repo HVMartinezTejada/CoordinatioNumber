@@ -7,21 +7,39 @@ import py3Dmol
 import re
 
 # ============================================================
-# 1. CONFIGURACIÓN INICIAL Y CARGA GLOBAL DE 3DMOL.JS
+# 1. CONFIGURACIÓN INICIAL Y CARGA GLOBAL DE 3DMOL.JS (con reintento)
 # ============================================================
 st.set_page_config(page_title="Simulador r/R - NC", layout="wide")
 
-# Cargar 3Dmol.js UNA VEZ para toda la app
-st.markdown(
-    """
-    <script src="https://cdn.jsdelivr.net/npm/3dmol@1.6.0/build/3Dmol.js"></script>
-    <script>
-        // Asegurar disponibilidad global
-        window.$3Dmol = window.$3Dmol || $3Dmol;
-    </script>
-    """,
-    unsafe_allow_html=True
-)
+# Cargar 3Dmol.js UNA VEZ para toda la app (con reintento)
+st.markdown("""
+<script>
+    (function load3Dmol() {
+        if (typeof $3Dmol !== 'undefined') {
+            console.log('✅ 3Dmol.js ya está cargado');
+            return;
+        }
+        console.log('⏳ Cargando 3Dmol.js desde cdnjs...');
+        var script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/3Dmol/1.6.0/3Dmol.js';
+        script.onload = function() {
+            console.log('✅ 3Dmol.js cargado correctamente');
+            window.$3Dmol = window.$3Dmol || $3Dmol;
+        };
+        script.onerror = function() {
+            console.error('❌ Error al cargar 3Dmol.js desde cdnjs, reintentando con jsDelivr...');
+            var script2 = document.createElement('script');
+            script2.src = 'https://cdn.jsdelivr.net/npm/3dmol@1.6.0/build/3Dmol.js';
+            script2.onload = function() {
+                console.log('✅ 3Dmol.js cargado desde jsDelivr');
+                window.$3Dmol = window.$3Dmol || $3Dmol;
+            };
+            document.head.appendChild(script2);
+        };
+        document.head.appendChild(script);
+    })();
+</script>
+""", unsafe_allow_html=True)
 
 st.title("📐 Simulador de Relación de Radios y Número de Coordinación")
 st.markdown("""
@@ -40,13 +58,10 @@ GEOMETRIAS = ["Triangular", "Tetraédrica", "Octaédrica", "Cúbica", "Cuboctaé
 colors = [cm.viridis(i / (len(NC_TIPICOS) - 1)) for i in range(len(NC_TIPICOS))]
 
 # ============================================================
-# 3. FUNCIÓN PARA GENERAR VISOR 3D (sin cambios)
+# 3. FUNCIÓN PARA GENERAR VISOR 3D
 # ============================================================
 def generar_visor(nc, vertices_norm, radio_anion, radio_cation, texto_etiqueta,
                   ancho=450, alto=450):
-    """
-    Crea un visor py3Dmol independiente con la geometría de coordinación.
-    """
     distancia_centro = radio_anion + radio_cation
     vertices = [[v * distancia_centro for v in pos] for pos in vertices_norm]
     
@@ -324,7 +339,7 @@ with col_grafica2:
     st.pyplot(fig2)
 
 # ============================================================
-# 10. VISUALIZACIONES 3D - GENERACIÓN CON PARCHE COMPLETO
+# 10. VISUALIZACIONES 3D - VERSIÓN ÚNICA Y OPTIMIZADA
 # ============================================================
 
 st.subheader("🧊 Geometrías de coordinación en 3D")
@@ -335,39 +350,7 @@ Puedes rotar, desplazar y hacer zoom con el mouse.
 """)
 
 # ------------------------------------------------------------
-# 🔥 CARGA GLOBAL DE 3DMOL.JS CON REINTENTO
-# ------------------------------------------------------------
-st.markdown("""
-<script>
-    (function load3Dmol() {
-        if (typeof $3Dmol !== 'undefined') {
-            console.log('✅ 3Dmol.js ya está cargado');
-            return;
-        }
-        console.log('⏳ Cargando 3Dmol.js desde cdnjs...');
-        var script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/3Dmol/1.6.0/3Dmol.js';
-        script.onload = function() {
-            console.log('✅ 3Dmol.js cargado correctamente');
-            window.$3Dmol = window.$3Dmol || $3Dmol;
-        };
-        script.onerror = function() {
-            console.error('❌ Error al cargar 3Dmol.js desde cdnjs, reintentando con jsDelivr...');
-            var script2 = document.createElement('script');
-            script2.src = 'https://cdn.jsdelivr.net/npm/3dmol@1.6.0/build/3Dmol.js';
-            script2.onload = function() {
-                console.log('✅ 3Dmol.js cargado desde jsDelivr');
-                window.$3Dmol = window.$3Dmol || $3Dmol;
-            };
-            document.head.appendChild(script2);
-        };
-        document.head.appendChild(script);
-    })();
-</script>
-""", unsafe_allow_html=True)
-
-# ------------------------------------------------------------
-# PARÁMETROS FIJOS
+# PARÁMETROS FIJOS PARA LAS VISUALIZACIONES
 # ------------------------------------------------------------
 R_ANION_FIJO = 1.0
 r_R_representativo = {
@@ -406,11 +389,9 @@ for nc in NC_TIPICOS:
     elif nc == 12:
         vertices = VERTICES_NC12
 
-    # 🔥 GENERAR VISOR SIN INCLUIR SCRIPT (usamos el global)
-    view = py3Dmol.view(width=450, height=450, linked=False, viewergrid=(1,1))
-    # view = py3Dmol.view(width=450, height=450, linked=False, viewergrid=(1,1), excludeScript=True)
+    # 🔧 Generar visor (sin parámetros problemáticos)
+    view = py3Dmol.view(width=450, height=450)
     
-    # Configurar escena (igual que antes)
     distancia_centro = R_ANION_FIJO + r_cat
     vertices_escalados = [[v * distancia_centro for v in pos] for pos in vertices]
     
@@ -457,23 +438,31 @@ for nc in NC_TIPICOS:
     })
     view.zoomTo()
 
-    # 🔥 OBTENER HTML Y PARCHEAR IDs (GLOBAL)
+    # 🔥 OBTENER HTML Y APLICAR PARCHES DEFINITIVOS
     html = view._make_html()
-    html = re.sub(r'3dmolviewer_(\d+)', r'viewer_\1', html)  # ¡CAMBIOS EN TODAS PARTES!
+    
+    # 1. Cambiar CDN por una más confiable (cdnjs)
+    html = html.replace(
+        "https://3dmol.org/build/3Dmol.js",
+        "https://cdnjs.cloudflare.com/ajax/libs/3Dmol/1.6.0/3Dmol.js"
+    )
+    
+    # 2. Reemplazar TODAS las referencias a IDs numéricos (¡solución al error de selector!)
+    html = re.sub(r'3dmolviewer_(\d+)', r'viewer_\1', html)
     
     visores[nc] = html
 
 # ------------------------------------------------------------
-# CUADRÍCULA 3x2 - USANDO st.components.v1.html (MÁS ROBUSTO)
+# 🖼️ CUADRÍCULA 3x2 - SOLO UNA VEZ, CON iframe (MÁS ROBUSTO)
 # ------------------------------------------------------------
 
-# Fila 1: NC=3 y NC=4
+# Fila 1: NC = 3 y NC = 4
 col1, col2 = st.columns(2)
 with col1:
     if 3 == nc_predicho:
         st.markdown('<div style="border: 3px solid gold; padding: 5px; border-radius: 10px;">', unsafe_allow_html=True)
     st.markdown("**NC = 3**  ·  *Triangular*")
-    st.components.v1.html(visores[3], height=450)   # 🟢 iframe
+    st.components.v1.html(visores[3], height=450)
     if 3 == nc_predicho:
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -485,7 +474,7 @@ with col2:
     if 4 == nc_predicho:
         st.markdown('</div>', unsafe_allow_html=True)
 
-# Fila 2: NC=6 y NC=8
+# Fila 2: NC = 6 y NC = 8
 col1, col2 = st.columns(2)
 with col1:
     if 6 == nc_predicho:
@@ -503,7 +492,7 @@ with col2:
     if 8 == nc_predicho:
         st.markdown('</div>', unsafe_allow_html=True)
 
-# Fila 3: NC=12 y leyenda
+# Fila 3: NC = 12 y Leyenda
 col1, col2 = st.columns(2)
 with col1:
     if 12 == nc_predicho:
@@ -528,75 +517,9 @@ with col2:
         </p>
     </div>
     """, unsafe_allow_html=True)
-    
-# ============================================================
-# 11. DISPOSICIÓN EN CUADRÍCULA 3x2 (CON ÍNDICES CORREGIDOS)
-# ============================================================
-
-# Fila 1: NC = 3 y NC = 4
-col1, col2 = st.columns(2)
-with col1:
-    if 3 == nc_predicho:
-        st.markdown('<div style="border: 3px solid gold; padding: 5px; border-radius: 10px;">', unsafe_allow_html=True)
-    st.markdown("**NC = 3**  ·  *Triangular*")
-    st.markdown(visores[3], unsafe_allow_html=True)   # ← ANTES ERA visores[6] (ERROR)
-    if 3 == nc_predicho:
-        st.markdown('</div>', unsafe_allow_html=True)
-
-with col2:
-    if 4 == nc_predicho:
-        st.markdown('<div style="border: 3px solid gold; padding: 5px; border-radius: 10px;">', unsafe_allow_html=True)
-    st.markdown("**NC = 4**  ·  *Tetraédrica*")
-    st.markdown(visores[4], unsafe_allow_html=True)
-    if 4 == nc_predicho:
-        st.markdown('</div>', unsafe_allow_html=True)
-
-# Fila 2: NC = 6 y NC = 8
-col1, col2 = st.columns(2)
-with col1:
-    if 6 == nc_predicho:
-        st.markdown('<div style="border: 3px solid gold; padding: 5px; border-radius: 10px;">', unsafe_allow_html=True)
-    st.markdown("**NC = 6**  ·  *Octaédrica*")
-    st.markdown(visores[6], unsafe_allow_html=True)
-    if 6 == nc_predicho:
-        st.markdown('</div>', unsafe_allow_html=True)
-
-with col2:
-    if 8 == nc_predicho:
-        st.markdown('<div style="border: 3px solid gold; padding: 5px; border-radius: 10px;">', unsafe_allow_html=True)
-    st.markdown("**NC = 8**  ·  *Cúbica*")
-    st.markdown(visores[8], unsafe_allow_html=True)
-    if 8 == nc_predicho:
-        st.markdown('</div>', unsafe_allow_html=True)
-
-# Fila 3: NC = 12 y Leyenda
-col1, col2 = st.columns(2)
-with col1:
-    if 12 == nc_predicho:
-        st.markdown('<div style="border: 3px solid gold; padding: 5px; border-radius: 10px;">', unsafe_allow_html=True)
-    st.markdown("**NC = 12**  ·  *Cuboctaédrica (Compacta)*")
-    st.markdown(visores[12], unsafe_allow_html=True)
-    if 12 == nc_predicho:
-        st.markdown('</div>', unsafe_allow_html=True)
-
-with col2:
-    st.markdown("""
-    <div style="background-color: #f0f2f6; padding: 20px; border-radius: 10px; height: 450px; display: flex; flex-direction: column; justify-content: center;">
-        <h4 style="text-align: center;">📘 Información</h4>
-        <p style="text-align: center;">
-        <span style="color:blue;">● Catión (central)</span><br>
-        <span style="color:red;">● Aniones (coordinados)</span><br><br>
-        <strong>Radios fijos para visualización:</strong><br>
-        Anión (R) = 1.0 Å<br>
-        Catión (r) = r/R × 1.0 Å<br>
-        (valores representativos del intervalo)<br><br>
-        <em>El visor NC=12 muestra solo 6 enlaces<br>para no saturar la escena.</em>
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
 
 # ============================================================
-# 12. LEYENDA DE COLORES Y EXPLICACIÓN TEÓRICA (CORREGIDA)
+# 11. LEYENDA DE COLORES Y EXPLICACIÓN TEÓRICA
 # ============================================================
 with st.expander("🎨 Guía de colores y explicación teórica"):
     col_col1, col_col2, col_col3, col_col4, col_col5 = st.columns(5)
@@ -651,9 +574,6 @@ with st.expander("🎨 Guía de colores y explicación teórica"):
     """)
 
 # ============================================================
-# 13. PIE DE PÁGINA
+# 12. PIE DE PÁGINA
 # ============================================================
 st.caption("App desarrollada con fines académicos por HV Martínez-Tejada. Basado en las reglas de radios de Pauling. Visualizaciones 3D con Py3Dmol.")
-
-
-
