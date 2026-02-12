@@ -4,15 +4,25 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import numpy as np
 import py3Dmol
+import re
 
 # ============================================================
-# 1. CONFIGURACIÓN INICIAL
+# 1. CONFIGURACIÓN INICIAL Y CARGA GLOBAL DE 3DMOL.JS
 # ============================================================
 st.set_page_config(page_title="Simulador r/R - NC", layout="wide")
+
+# Cargar 3Dmol.js UNA VEZ para toda la app
 st.markdown(
-    '<script src="https://cdn.jsdelivr.net/npm/3dmol@1.6.0/build/3Dmol.js"></script>',
+    """
+    <script src="https://cdn.jsdelivr.net/npm/3dmol@1.6.0/build/3Dmol.js"></script>
+    <script>
+        // Asegurar disponibilidad global
+        window.$3Dmol = window.$3Dmol || $3Dmol;
+    </script>
+    """,
     unsafe_allow_html=True
 )
+
 st.title("📐 Simulador de Relación de Radios y Número de Coordinación")
 st.markdown("""
 **Teoría:** Esta app visualiza cómo la relación entre el radio del catión (r) y el anión (R) 
@@ -30,24 +40,18 @@ GEOMETRIAS = ["Triangular", "Tetraédrica", "Octaédrica", "Cúbica", "Cuboctaé
 colors = [cm.viridis(i / (len(NC_TIPICOS) - 1)) for i in range(len(NC_TIPICOS))]
 
 # ============================================================
-# 3. FUNCIONES PARA VISUALIZACIONES 3D (MEJORADAS)
+# 3. FUNCIÓN PARA GENERAR VISOR 3D (sin cambios)
 # ============================================================
 def generar_visor(nc, vertices_norm, radio_anion, radio_cation, texto_etiqueta,
                   ancho=450, alto=450):
     """
     Crea un visor py3Dmol independiente con la geometría de coordinación.
-    - vertices_norm: coordenadas normalizadas (distancia 1 desde el centro).
-    - radio_anion, radio_cation: radios de las esferas.
-    - texto_etiqueta: texto flotante (NC, geometría, intervalo r/R).
-    - ancho, alto: dimensiones del visor en píxeles.
     """
-    # Escalar posiciones para que las esferas sean tangentes
     distancia_centro = radio_anion + radio_cation
     vertices = [[v * distancia_centro for v in pos] for pos in vertices_norm]
     
     view = py3Dmol.view(width=ancho, height=alto)
     
-    # ---- Aniones (rojo, semitransparente) ----
     for v in vertices:
         view.addSphere({
             'center': {'x': v[0], 'y': v[1], 'z': v[2]},
@@ -57,7 +61,6 @@ def generar_visor(nc, vertices_norm, radio_anion, radio_cation, texto_etiqueta,
             'wireframe': False
         })
     
-    # ---- Catión central (azul) ----
     view.addSphere({
         'center': {'x': 0, 'y': 0, 'z': 0},
         'radius': radio_cation,
@@ -66,7 +69,6 @@ def generar_visor(nc, vertices_norm, radio_anion, radio_cation, texto_etiqueta,
         'wireframe': False
     })
     
-    # ---- Enlaces (cilindros grises) - solo algunos en NC=12 para no saturar ----
     enlaces_mostrar = vertices[:6] if nc == 12 else vertices
     for v in enlaces_mostrar:
         view.addCylinder({
@@ -76,7 +78,6 @@ def generar_visor(nc, vertices_norm, radio_anion, radio_cation, texto_etiqueta,
             'color': 'gray'
         })
     
-    # ---- Etiqueta flotante con información ----
     max_z = max([p[2] for p in vertices] + [0])
     view.addLabel(texto_etiqueta, {
         'position': {'x': 0, 'y': 0, 'z': max_z + 2.2},
@@ -87,7 +88,6 @@ def generar_visor(nc, vertices_norm, radio_anion, radio_cation, texto_etiqueta,
         'inFront': True
     })
     
-    # ---- Ajuste de cámara para encuadre perfecto ----
     view.setView({
         'fov': 35,
         'position': [0, 0, distancia_centro * 3.5],
@@ -221,7 +221,6 @@ st.subheader("📈 Relación entre R y r/R")
 
 col_grafica1, col_grafica2 = st.columns(2)
 
-# Rango completo de R (0.1 a 7.0 Å)
 R_range_full = [i/100 for i in range(10, 701)]
 r_R_range_full = [radio_cation / R if R > 0 else 0 for R in R_range_full]
 
@@ -278,7 +277,6 @@ with col_grafica2:
     ax2.axvline(x=radio_anion, color='g', linestyle='--', alpha=0.7, linewidth=1.5,
                 label=f'R actual ({radio_anion:.2f} Å)')
     
-    # Transición 2D/3D
     R_transicion = radio_cation / 0.225
     if x_min <= R_transicion <= x_max:
         ax2.axvline(x=R_transicion, color='purple', linestyle='-.', linewidth=1.8, alpha=0.9,
@@ -286,14 +284,12 @@ with col_grafica2:
     ax2.axhline(y=0.225, color='purple', linestyle='-.', linewidth=1.8, alpha=0.9,
                 label='Límite 2D/3D (r/R = 0.225)')
     
-    # Región 2D (NC=3) - trama gris
     ax2.axhspan(0.155, 0.225, alpha=0.4, color='#555555', hatch='///',
                 label='Región 2D (NC=3, planar)')
     if y_max_zoom > 0.19:
         ax2.text(x_min + 0.1, 0.19, '2D', fontsize=11, weight='bold', color='white',
                  bbox=dict(boxstyle='round', facecolor='#555555', alpha=0.8))
     
-    # Regiones 3D (NC≥4) - viridis
     ax2.axhspan(0.225, 0.414, alpha=0.35, color=colors[1], label='NC 4')
     ax2.axhspan(0.414, 0.732, alpha=0.35, color=colors[2], label='NC 6')
     ax2.axhspan(0.732, 1.000, alpha=0.35, color=colors[3], label='NC 8')
@@ -304,7 +300,6 @@ with col_grafica2:
         ax2.text(x_min + 0.1, 0.30, '3D', fontsize=11, weight='bold', color='white',
                  bbox=dict(boxstyle='round', facecolor=colors[1], alpha=0.8))
     
-    # Líneas divisorias NC=3 / NC=4
     ax2.axhline(y=0.155, color='black', linestyle='-', linewidth=1.0, alpha=0.5)
     ax2.axhline(y=0.225, color='black', linestyle='-', linewidth=1.0, alpha=0.5)
     
@@ -329,11 +324,8 @@ with col_grafica2:
     st.pyplot(fig2)
 
 # ============================================================
-# 10. VISUALIZACIONES 3D - ORGANIZACIÓN EN CUADRÍCULA 3x2
+# 10. VISUALIZACIONES 3D - GENERACIÓN CON PARCHE COMPLETO
 # ============================================================
-# st.markdown("### 🧪 Visor de prueba (NC=6)")
-# st.markdown(visores[6], height=450)
-
 st.subheader("🧊 Geometrías de coordinación en 3D")
 st.markdown("""
 Cada visor muestra un poliedro de coordinación con **aniones rojos** y **catión azul central**.  
@@ -341,20 +333,20 @@ Los tamaños relativos corresponden a los valores típicos de r/R dentro de cada
 Puedes rotar, desplazar y hacer zoom con el mouse.
 """)
 
-# Parámetros fijos para las visualizaciones (anión = 1.0 Å)
+# Parámetros fijos para las visualizaciones
 R_ANION_FIJO = 1.0
 
-# Valores representativos de r/R dentro de cada intervalo
+# Valores representativos de r/R DENTRO de cada intervalo (CORREGIDO)
 r_R_representativo = {
-    3: 0.19,
-    4: 0.19,
-    6: 0.30,
-    8: 0.60,
-    12: 0.80
+    3: 0.19,   # 0.155–0.225
+    4: 0.30,   # 0.225–0.414  ← antes era 0.19, ahora se ve proporcionado
+    6: 0.50,   # 0.414–0.732
+    8: 0.80,   # 0.732–1.000
+    12: 0.90   # >1.000
 }
 
-# Generar los visores para cada NC
 visores = {}
+
 for nc in NC_TIPICOS:
     r_cat = r_R_representativo[nc] * R_ANION_FIJO
     idx = NC_TIPICOS.index(nc)
@@ -383,9 +375,32 @@ for nc in NC_TIPICOS:
     
     visor = generar_visor(nc, vertices, R_ANION_FIJO, r_cat, etiqueta,
                           ancho=450, alto=450)
-    visores[nc] = visor._make_html()   # <--- ¡IMPORTANTE!
+    
+    # --- PARCHE CRÍTICO: limpiar el HTML generado ---
+    html = visor._make_html()
+    
+    # 1. CDN confiable (jsDelivr)
+    html = html.replace(
+        "https://3dmol.org/build/3Dmol.js",
+        "https://cdn.jsdelivr.net/npm/3dmol@1.6.0/build/3Dmol.js"
+    )
+    
+    # 2. Eliminar script que detecta JupyterLab (causa error)
+    html = re.sub(
+        r'<script[\s\S]*?You appear to be running in JupyterLab[\s\S]*?</script>',
+        '',
+        html
+    )
+    
+    # 3. Cambiar IDs que empiezan con dígito (selector inválido)
+    html = re.sub(r'id="3dmolviewer_(\d+)"', r'id="viewer_\1"', html)
+    html = re.sub(r'#3dmolviewer_(\d+)', r'#viewer_\1', html)
+    
+    visores[nc] = html
 
-# ---- DISPOSICIÓN EN CUADRÍCULA 3 FILAS x 2 COLUMNAS ----
+# ============================================================
+# 11. DISPOSICIÓN EN CUADRÍCULA 3x2 (CON ÍNDICES CORREGIDOS)
+# ============================================================
 
 # Fila 1: NC = 3 y NC = 4
 col1, col2 = st.columns(2)
@@ -393,7 +408,7 @@ with col1:
     if 3 == nc_predicho:
         st.markdown('<div style="border: 3px solid gold; padding: 5px; border-radius: 10px;">', unsafe_allow_html=True)
     st.markdown("**NC = 3**  ·  *Triangular*")
-    st.markdown(visores[6], unsafe_allow_html=True)
+    st.markdown(visores[3], unsafe_allow_html=True)   # ← ANTES ERA visores[6] (ERROR)
     if 3 == nc_predicho:
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -450,7 +465,7 @@ with col2:
     """, unsafe_allow_html=True)
 
 # ============================================================
-# 11. LEYENDA DE COLORES Y EXPLICACIÓN TEÓRICA
+# 12. LEYENDA DE COLORES Y EXPLICACIÓN TEÓRICA (CORREGIDA)
 # ============================================================
 with st.expander("🎨 Guía de colores y explicación teórica"):
     col_col1, col_col2, col_col3, col_col4, col_col5 = st.columns(5)
@@ -491,9 +506,9 @@ with st.expander("🎨 Guía de colores y explicación teórica"):
             unsafe_allow_html=True
         )
     
-    st.markdown("""
+    st.markdown(r"""
     **Interpretación de la transición 2D → 3D**
-    - El valor r"**\( R = r / 0.225 \)**" es el límite inferior para la coordinación tetraédrica (3D) y el superior para la triangular (2D).
+    - El valor **r/R = 0.225** es el límite inferior para la coordinación tetraédrica (3D) y el superior para la triangular (2D).
     - Para un catión de radio `r` fijo, el tamaño de anión que produce esta transición es **\( R = r / 0.225 \)**.
     - En la gráfica de zoom, puedes **ajustar el límite superior del eje Y** para ampliar la región inferior y observar con claridad las franjas de NC=3 y NC=4.
     
@@ -505,18 +520,6 @@ with st.expander("🎨 Guía de colores y explicación teórica"):
     """)
 
 # ============================================================
-# 12. PIE DE PÁGINA
+# 13. PIE DE PÁGINA
 # ============================================================
 st.caption("App desarrollada con fines académicos por HV Martínez-Tejada. Basado en las reglas de radios de Pauling. Visualizaciones 3D con Py3Dmol.")
-
-
-
-
-
-
-
-
-
-
-
-
