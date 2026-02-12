@@ -324,13 +324,13 @@ with col_grafica2:
     st.pyplot(fig2)
 
 # ============================================================
-# 10. VISUALIZACIONES 3D - (ACTUALIZADO: 1 visor por defecto + JS robusto en iframe)
+# 10. VISUALIZACIONES 3D - FIX robusto ($3Dmol en iframe) + 1 visor por defecto
 # ============================================================
 
 st.subheader("🧊 Geometrías de coordinación en 3D")
 st.markdown("""
-Aquí se muestra **por defecto** la geometría 3D correspondiente al **NC predicho** (según tus radios r y R).  
-Opcionalmente puedes **explorar otra geometría** o **comparar todas** (modo didáctico).
+Aquí se muestra **por defecto** la geometría correspondiente al **NC predicho** (según tus radios *r* y *R*).  
+Si quieres, puedes **explorar** o **comparar todas** (modo didáctico).
 """)
 
 # --- Helper: elegir vértices según NC ---
@@ -339,42 +339,40 @@ _vertices_por_nc = {
     4: VERTICES_NC4,
     6: VERTICES_NC6,
     8: VERTICES_NC8,
-    12: VERTICES_NC12
+    12: VERTICES_NC12,
 }
 
-# --- Helper: parche HTML para Streamlit (iframe) ---
+# --- Helper: parche HTML para Streamlit (iframe srcdoc) ---
 def _patch_html_para_streamlit(raw_html: str) -> str:
     """
-    Hace el HTML más robusto en Streamlit:
-    - Asegura jQuery (muchos HTMLs de py3Dmol usan $(...))
-    - Asegura 3Dmol.js dentro del iframe (no depender del 'global' de la página)
+    Garantiza que dentro del iframe exista $3Dmol:
+    - Inserta SIEMPRE jQuery + 3Dmol-min.js antes del primer <script> del HTML del visor.
+    - Elimina cualquier asignación insegura tipo window.$3Dmol = ... $3Dmol;
     """
-    jquery_src = "https://code.jquery.com/jquery-3.7.1.min.js"
-    mol_src = "https://cdn.jsdelivr.net/npm/3dmol@1.6.0/build/3Dmol-min.js"
+    # 1) Quitar asignaciones inseguras si vinieran en el HTML
+    raw_html = re.sub(
+        r'window\.\$3Dmol\s*=\s*window\.\$3Dmol\s*\|\|\s*\$3Dmol\s*;?',
+        '',
+        raw_html
+    )
 
-    jquery_tag = f'<script src="{jquery_src}"></script>'
-    mol_tag = f'<script src="{mol_src}"></script>'
-    assign_tag = "<script>window.$3Dmol = window.$3Dmol || $3Dmol;</script>"
+    # 2) Insertar librerías antes del primer script (para que carguen antes del init)
+    inject = """
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/3dmol@1.6.0/build/3Dmol-min.js"></script>
+"""
+    m = re.search(r"<script", raw_html, flags=re.IGNORECASE)
+    if m:
+        return raw_html[:m.start()] + inject + raw_html[m.start():]
+    return inject + raw_html
 
-    # Evitar duplicados si ya vienen en el HTML
-    need_jq = ("jquery" not in raw_html.lower()) and ("$" in raw_html or "jQuery" in raw_html)
-    need_mol = ("3dmol" not in raw_html.lower())  # amplio; si ya lo trae, no añadimos
-
-    inject = []
-    if need_jq:
-        inject.append(jquery_tag)
-    if need_mol:
-        inject.append(mol_tag)
-    inject.append(assign_tag)
-
-    inject_block = "\n".join(inject) + "\n"
-
-    if "<head>" in raw_html:
-        raw_html = raw_html.replace("<head>", "<head>\n" + inject_block, 1)
-    else:
-        raw_html = inject_block + raw_html
-
-    return raw_html
+# --- Construcción HTML de un visor ---
+def _make_viewer_html(nc: int, R: float, r: float, etiqueta: str, ancho=520, alto=520) -> str:
+    vertices_norm = _vertices_por_nc[nc]
+    view = generar_visor(nc, vertices_norm, R, r, etiqueta, ancho=ancho, alto=alto)
+    html = view._make_html()
+    html = _patch_html_para_streamlit(html)
+    return html
 
 # --- Selector de modo (por defecto: SOLO predicha) ---
 modo = st.radio(
@@ -393,19 +391,11 @@ if modo == "Explorar (elegir NC manualmente)":
 else:
     nc_elegido = nc_predicho
 
-# --- visores debe existir para Bloque 11 (sin tocarlo) ---
-#     Para evitar errores, inicializamos todas las claves con string vacío.
+# --- visores debe existir para el Bloque 11 (y evitar KeyError) ---
 visores = {nc: "" for nc in NC_TIPICOS}
 
-def _construir_html_visor(nc: int, R: float, r: float, etiqueta: str, ancho=520, alto=520) -> str:
-    vertices_norm = _vertices_por_nc[nc]
-    view = generar_visor(nc, vertices_norm, R, r, etiqueta, ancho=ancho, alto=alto)
-    raw_html = view._make_html()
-    return _patch_html_para_streamlit(raw_html)
-
-# --- Construcción (solo lo necesario) ---
 if modo == "Comparar todas (3×2)":
-    # Radios representativos por NC para comparación visual (evita distorsión extrema)
+    # Radios representativos por NC para comparación visual
     R_ANION_FIJO = 1.0
     r_R_representativo = {3: 0.19, 4: 0.30, 6: 0.50, 8: 0.80, 12: 0.90}
 
@@ -420,9 +410,102 @@ if modo == "Comparar todas (3×2)":
 
         etiqueta = f"NC = {nc}\\n{GEOMETRIAS[idx]}\\nr/R: {intervalo}"
         r_rep = r_R_representativo[nc] * R_ANION_FIJO
-        visores[nc] = _construir_html_visor(nc, R_ANION_FIJO, r_rep, etiqueta, ancho=450, alto=450)
+        visores[nc] = _make_viewer_html(nc, R_ANION_FIJO, r_rep, etiqueta, ancho=450, alto=450)
 
-    # --- Render 3×2 con iframes (robusto) ---
+    # Render principal (igual que antes, pero robusto)
+    col1, col2 = st.columns(2)
+    with col1:
+        if 3 == nc_predicho:
+            st.markdown('<div style="border: 3px solid gold; padding: 6px; border-radius: 12px;">', unsafe_allow_html=True)
+        st.markdown("**NC = 3**  ·  *Triangular*")
+        st.components.v1.html(visores[3], height=450)
+        if 3 == nc_predicho:
+            st.markdown('</div>', unsafe_allow_html=True)
+
+    with col2:
+        if 4 == nc_predicho:
+            st.markdown('<div style="border: 3px solid gold; padding: 6px; border-radius: 12px;">', unsafe_allow_html=True)
+        st.markdown("**NC = 4**  ·  *Tetraédrica*")
+        st.components.v1.html(visores[4], height=450)
+        if 4 == nc_predicho:
+            st.markdown('</div>', unsafe_allow_html=True)
+
+    col1, col2 = st.columns(2)
+    with col1:
+        if 6 == nc_predicho:
+            st.markdown('<div style="border: 3px solid gold; padding: 6px; border-radius: 12px;">', unsafe_allow_html=True)
+        st.markdown("**NC = 6**  ·  *Octaédrica*")
+        st.components.v1.html(visores[6], height=450)
+        if 6 == nc_predicho:
+            st.markdown('</div>', unsafe_allow_html=True)
+
+    with col2:
+        if 8 == nc_predicho:
+            st.markdown('<div style="border: 3px solid gold; padding: 6px; border-radius: 12px;">', unsafe_allow_html=True)
+        st.markdown("**NC = 8**  ·  *Cúbica*")
+        st.components.v1.html(visores[8], height=450)
+        if 8 == nc_predicho:
+            st.markdown('</div>', unsafe_allow_html=True)
+
+    col1, col2 = st.columns(2)
+    with col1:
+        if 12 == nc_predicho:
+            st.markdown('<div style="border: 3px solid gold; padding: 6px; border-radius: 12px;">', unsafe_allow_html=True)
+        st.markdown("**NC = 12**  ·  *Cuboctaédrica (Compacta)*")
+        st.components.v1.html(visores[12], height=450)
+        if 12 == nc_predicho:
+            st.markdown('</div>', unsafe_allow_html=True)
+
+    with col2:
+        st.markdown("""
+        <div style="background-color: #f0f2f6; padding: 20px; border-radius: 10px; height: 450px; display: flex; flex-direction: column; justify-content: center;">
+            <h4 style="text-align: center;">📘 Información</h4>
+            <p style="text-align: center;">
+            <span style="color:blue;">● Catión (central)</span><br>
+            <span style="color:red;">● Aniones (coordinados)</span><br><br>
+            <strong>Modo comparar:</strong><br>
+            Se usan radios representativos<br>
+            para cada intervalo r/R.<br><br>
+            <em>En NC=12 se muestran solo 6 enlaces<br>para no saturar la escena.</em>
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+else:
+    # Modo predicho / explorar: usar radios reales del usuario
+    idx = NC_TIPICOS.index(nc_elegido)
+    etiqueta = (
+        f"NC = {nc_elegido}\\n"
+        f"{GEOMETRIAS[idx]}\\n"
+        f"r = {radio_cation:.2f} Å\\n"
+        f"R = {radio_anion:.2f} Å\\n"
+        f"r/R = {relacion_r_R:.3f}"
+    )
+
+    visores[nc_elegido] = _make_viewer_html(
+        nc_elegido, radio_anion, radio_cation, etiqueta, ancho=560, alto=560
+    )
+
+    highlight = (nc_elegido == nc_predicho)
+    if highlight:
+        st.markdown('<div style="border: 3px solid gold; padding: 8px; border-radius: 12px;">', unsafe_allow_html=True)
+
+    st.markdown(f"### ✅ Geometría mostrada: **NC = {nc_elegido}** · *{GEOMETRIAS[idx]}*")
+    st.components.v1.html(visores[nc_elegido], height=580)
+
+    if highlight:
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    st.caption("Si ves blanco: abre DevTools → Network y confirma que 3Dmol-min.js carga (status 200) dentro del iframe.")
+
+# ============================================================
+# 11. DISPOSICIÓN EN CUADRÍCULA 3x2 (ARREGLADO: usar componentes; sin duplicar por defecto)
+# ============================================================
+
+if modo == "Comparar todas (3×2)":
+    st.subheader("🧩 Cuadrícula 3×2 (comparación didáctica)")
+
+    # Fila 1
     col1, col2 = st.columns(2)
     with col1:
         st.markdown("**NC = 3**  ·  *Triangular*")
@@ -431,6 +514,7 @@ if modo == "Comparar todas (3×2)":
         st.markdown("**NC = 4**  ·  *Tetraédrica*")
         st.components.v1.html(visores[4], height=450)
 
+    # Fila 2
     col1, col2 = st.columns(2)
     with col1:
         st.markdown("**NC = 6**  ·  *Octaédrica*")
@@ -439,6 +523,7 @@ if modo == "Comparar todas (3×2)":
         st.markdown("**NC = 8**  ·  *Cúbica*")
         st.components.v1.html(visores[8], height=450)
 
+    # Fila 3
     col1, col2 = st.columns(2)
     with col1:
         st.markdown("**NC = 12**  ·  *Cuboctaédrica (Compacta)*")
@@ -450,114 +535,14 @@ if modo == "Comparar todas (3×2)":
             <p style="text-align: center;">
             <span style="color:blue;">● Catión (central)</span><br>
             <span style="color:red;">● Aniones (coordinados)</span><br><br>
-            <strong>Modo comparar:</strong><br>
-            Se usan radios representativos<br>
-            para cada intervalo r/R.<br><br>
-            <em>El visor NC=12 muestra solo 6 enlaces<br>para no saturar la escena.</em>
+            <strong>Nota:</strong><br>
+            Esta cuadrícula solo aparece en “Comparar todas”<br>
+            para evitar saturación visual en modo normal.
             </p>
         </div>
         """, unsafe_allow_html=True)
-
 else:
-    # --- Modo predicho / explorar: usar los radios del usuario ---
-    idx = NC_TIPICOS.index(nc_elegido)
-    etiqueta = (
-        f"NC = {nc_elegido}\\n"
-        f"{GEOMETRIAS[idx]}\\n"
-        f"r = {radio_cation:.2f} Å\\n"
-        f"R = {radio_anion:.2f} Å\\n"
-        f"r/R = {relacion_r_R:.3f}"
-    )
-
-    # Construimos SOLO el visor elegido y lo guardamos también en visores[nc_elegido]
-    visores[nc_elegido] = _construir_html_visor(
-        nc_elegido,
-        radio_anion,
-        radio_cation,
-        etiqueta,
-        ancho=520,
-        alto=520
-    )
-
-    # Render único (con borde dorado si coincide con el predicho)
-    highlight = (nc_elegido == nc_predicho)
-    if highlight:
-        st.markdown('<div style="border: 3px solid gold; padding: 8px; border-radius: 12px;">', unsafe_allow_html=True)
-
-    st.markdown(f"### ✅ Geometría mostrada: **NC = {nc_elegido}** · *{GEOMETRIAS[idx]}*")
-    st.components.v1.html(visores[nc_elegido], height=540)
-
-    if highlight:
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    st.caption("Tip: rota, desplaza y haz zoom con el mouse. Si no ves nada, revisa la consola del navegador por errores JS (p. ej., '$ is not defined').")
-
-# ============================================================
-# 11. DISPOSICIÓN EN CUADRÍCULA 3x2 (CON ÍNDICES CORREGIDOS)
-# ============================================================
-
-# Fila 1: NC = 3 y NC = 4
-col1, col2 = st.columns(2)
-with col1:
-    if 3 == nc_predicho:
-        st.markdown('<div style="border: 3px solid gold; padding: 5px; border-radius: 10px;">', unsafe_allow_html=True)
-    st.markdown("**NC = 3**  ·  *Triangular*")
-    st.markdown(visores[3], unsafe_allow_html=True)   # ← ANTES ERA visores[6] (ERROR)
-    if 3 == nc_predicho:
-        st.markdown('</div>', unsafe_allow_html=True)
-
-with col2:
-    if 4 == nc_predicho:
-        st.markdown('<div style="border: 3px solid gold; padding: 5px; border-radius: 10px;">', unsafe_allow_html=True)
-    st.markdown("**NC = 4**  ·  *Tetraédrica*")
-    st.markdown(visores[4], unsafe_allow_html=True)
-    if 4 == nc_predicho:
-        st.markdown('</div>', unsafe_allow_html=True)
-
-# Fila 2: NC = 6 y NC = 8
-col1, col2 = st.columns(2)
-with col1:
-    if 6 == nc_predicho:
-        st.markdown('<div style="border: 3px solid gold; padding: 5px; border-radius: 10px;">', unsafe_allow_html=True)
-    st.markdown("**NC = 6**  ·  *Octaédrica*")
-    st.markdown(visores[6], unsafe_allow_html=True)
-    if 6 == nc_predicho:
-        st.markdown('</div>', unsafe_allow_html=True)
-
-with col2:
-    if 8 == nc_predicho:
-        st.markdown('<div style="border: 3px solid gold; padding: 5px; border-radius: 10px;">', unsafe_allow_html=True)
-    st.markdown("**NC = 8**  ·  *Cúbica*")
-    st.markdown(visores[8], unsafe_allow_html=True)
-    if 8 == nc_predicho:
-        st.markdown('</div>', unsafe_allow_html=True)
-
-# Fila 3: NC = 12 y Leyenda
-col1, col2 = st.columns(2)
-with col1:
-    if 12 == nc_predicho:
-        st.markdown('<div style="border: 3px solid gold; padding: 5px; border-radius: 10px;">', unsafe_allow_html=True)
-    st.markdown("**NC = 12**  ·  *Cuboctaédrica (Compacta)*")
-    st.markdown(visores[12], unsafe_allow_html=True)
-    if 12 == nc_predicho:
-        st.markdown('</div>', unsafe_allow_html=True)
-
-with col2:
-    st.markdown("""
-    <div style="background-color: #f0f2f6; padding: 20px; border-radius: 10px; height: 450px; display: flex; flex-direction: column; justify-content: center;">
-        <h4 style="text-align: center;">📘 Información</h4>
-        <p style="text-align: center;">
-        <span style="color:blue;">● Catión (central)</span><br>
-        <span style="color:red;">● Aniones (coordinados)</span><br><br>
-        <strong>Radios fijos para visualización:</strong><br>
-        Anión (R) = 1.0 Å<br>
-        Catión (r) = r/R × 1.0 Å<br>
-        (valores representativos del intervalo)<br><br>
-        <em>El visor NC=12 muestra solo 6 enlaces<br>para no saturar la escena.</em>
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-
+    st.caption("La cuadrícula completa (Bloque 11) se muestra solo si eliges **“Comparar todas (3×2)”**.")
 # ============================================================
 # 12. LEYENDA DE COLORES Y EXPLICACIÓN TEÓRICA (CORREGIDA)
 # ============================================================
@@ -617,3 +602,4 @@ with st.expander("🎨 Guía de colores y explicación teórica"):
 # 13. PIE DE PÁGINA
 # ============================================================
 st.caption("App desarrollada con fines académicos por HV Martínez-Tejada. Basado en las reglas de radios de Pauling. Visualizaciones 3D con Py3Dmol.")
+
