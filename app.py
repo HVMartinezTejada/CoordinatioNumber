@@ -326,6 +326,9 @@ with col_grafica2:
 # ============================================================
 # 10. VISUALIZACIONES 3D - GENERACIÓN CON PARCHE COMPLETO
 # ============================================================
+# ============================================================
+# 10. VISUALIZACIONES 3D - GENERACIÓN CON PARCHE TOTAL
+# ============================================================
 st.subheader("🧊 Geometrías de coordinación en 3D")
 st.markdown("""
 Cada visor muestra un poliedro de coordinación con **aniones rojos** y **catión azul central**.  
@@ -333,16 +336,15 @@ Los tamaños relativos corresponden a los valores típicos de r/R dentro de cada
 Puedes rotar, desplazar y hacer zoom con el mouse.
 """)
 
-# Parámetros fijos para las visualizaciones
 R_ANION_FIJO = 1.0
 
-# Valores representativos de r/R DENTRO de cada intervalo (CORREGIDO)
+# Radios representativos (corregidos)
 r_R_representativo = {
-    3: 0.19,   # 0.155–0.225
-    4: 0.30,   # 0.225–0.414  ← antes era 0.19, ahora se ve proporcionado
-    6: 0.50,   # 0.414–0.732
-    8: 0.80,   # 0.732–1.000
-    12: 0.90   # >1.000
+    3: 0.19,
+    4: 0.30,
+    6: 0.50,
+    8: 0.80,
+    12: 0.90
 }
 
 visores = {}
@@ -376,28 +378,29 @@ for nc in NC_TIPICOS:
     visor = generar_visor(nc, vertices, R_ANION_FIJO, r_cat, etiqueta,
                           ancho=450, alto=450)
     
-    # --- PARCHE CRÍTICO: limpiar el HTML generado ---
     html = visor._make_html()
     
-    # 1. CDN confiable (jsDelivr)
+    # --------------------------------------------------------
+    # 🚀 PARCHE DEFINITIVO (reemplaza TODAS las ocurrencias)
+    # --------------------------------------------------------
+    # 1. Reemplazar TODAS las ocurrencias de '3dmolviewer_' + dígitos por 'viewer_' + dígitos
+    html = re.sub(r'3dmolviewer_(\d+)', r'viewer_\1', html)
+    
+    # 2. Usar CDN confiable (jsDelivr)
     html = html.replace(
         "https://3dmol.org/build/3Dmol.js",
         "https://cdn.jsdelivr.net/npm/3dmol@1.6.0/build/3Dmol.js"
     )
     
-    # 2. Eliminar script que detecta JupyterLab (causa error)
+    # 3. Eliminar script molesto de detección de JupyterLab
     html = re.sub(
         r'<script[\s\S]*?You appear to be running in JupyterLab[\s\S]*?</script>',
         '',
         html
     )
     
-    # 3. Cambiar IDs que empiezan con dígito (selector inválido)
-    html = re.sub(r'id="3dmolviewer_(\d+)"', r'id="viewer_\1"', html)
-    html = re.sub(r'#3dmolviewer_(\d+)', r'#viewer_\1', html)
-    
     visores[nc] = html
-
+    
 # ============================================================
 # 11. DISPOSICIÓN EN CUADRÍCULA 3x2 (CON ÍNDICES CORREGIDOS)
 # ============================================================
@@ -523,3 +526,4 @@ with st.expander("🎨 Guía de colores y explicación teórica"):
 # 13. PIE DE PÁGINA
 # ============================================================
 st.caption("App desarrollada con fines académicos por HV Martínez-Tejada. Basado en las reglas de radios de Pauling. Visualizaciones 3D con Py3Dmol.")
+
