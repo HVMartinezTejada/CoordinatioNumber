@@ -386,7 +386,7 @@ with col1:
     if 3 == nc_predicho:
         st.markdown('<div style="border: 3px solid gold; padding: 5px; border-radius: 10px;">', unsafe_allow_html=True)
     st.markdown("**NC = 3**  ·  *Triangular*")
-    st.components.v1.html(visores[3], height=450)
+    st.markdown(visores[6], unsafe_allow_html=True)
     if 3 == nc_predicho:
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -501,5 +501,6 @@ with st.expander("🎨 Guía de colores y explicación teórica"):
 # 12. PIE DE PÁGINA
 # ============================================================
 st.caption("App desarrollada con fines académicos por HV Martínez-Tejada. Basado en las reglas de radios de Pauling. Visualizaciones 3D con Py3Dmol.")
+
 
 
