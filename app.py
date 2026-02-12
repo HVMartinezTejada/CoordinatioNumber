@@ -201,7 +201,7 @@ df_limites = pd.DataFrame({
     "Geometría": GEOMETRIAS,
     "Límite inferior r/R": LIMITES_NC
 })
-st.dataframe(df_limites, use_container_width=True, hide_index=True)
+st.dataframe(df_limites, width="stretch", hide_index=True)
 
 st.markdown(f"**Posición actual de r/R ({relacion_r_R:.3f}) en la escala:**")
 posicion_relativa = min(relacion_r_R / 1.1, 1.0)
@@ -489,7 +489,7 @@ with st.expander("🎨 Guía de colores y explicación teórica"):
     
     st.markdown("""
     **Interpretación de la transición 2D → 3D**
-    - El valor **`r/R = 0.225`** es el límite inferior para la coordinación tetraédrica (3D) y el superior para la triangular (2D).
+    - El valor r"**\( R = r / 0.225 \)**" es el límite inferior para la coordinación tetraédrica (3D) y el superior para la triangular (2D).
     - Para un catión de radio `r` fijo, el tamaño de anión que produce esta transición es **\( R = r / 0.225 \)**.
     - En la gráfica de zoom, puedes **ajustar el límite superior del eje Y** para ampliar la región inferior y observar con claridad las franjas de NC=3 y NC=4.
     
@@ -504,6 +504,7 @@ with st.expander("🎨 Guía de colores y explicación teórica"):
 # 12. PIE DE PÁGINA
 # ============================================================
 st.caption("App desarrollada con fines académicos por HV Martínez-Tejada. Basado en las reglas de radios de Pauling. Visualizaciones 3D con Py3Dmol.")
+
 
 
 
