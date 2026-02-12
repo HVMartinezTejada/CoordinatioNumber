@@ -407,7 +407,8 @@ for nc in NC_TIPICOS:
         vertices = VERTICES_NC12
 
     # 🔥 GENERAR VISOR SIN INCLUIR SCRIPT (usamos el global)
-    view = py3Dmol.view(width=450, height=450, linked=False, viewergrid=(1,1), excludeScript=True)
+    view = py3Dmol.view(width=450, height=450, linked=False, viewergrid=(1,1))
+    # view = py3Dmol.view(width=450, height=450, linked=False, viewergrid=(1,1), excludeScript=True)
     
     # Configurar escena (igual que antes)
     distancia_centro = R_ANION_FIJO + r_cat
@@ -653,5 +654,6 @@ with st.expander("🎨 Guía de colores y explicación teórica"):
 # 13. PIE DE PÁGINA
 # ============================================================
 st.caption("App desarrollada con fines académicos por HV Martínez-Tejada. Basado en las reglas de radios de Pauling. Visualizaciones 3D con Py3Dmol.")
+
 
 
