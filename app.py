@@ -324,17 +324,13 @@ with col_grafica2:
     st.pyplot(fig2)
 
 # ============================================================
-# 10. VISUALIZACIONES 3D - FIX robusto ($3Dmol en iframe) + 1 visor por defecto
-# ============================================================
-
-# ============================================================
-# 10. VISUALIZACIONES 3D - FIX robusto ($3Dmol en iframe) + 1 visor por defecto
+# 10. VISUALIZACIONES 3D - FIX robusto + 1 visor por defecto
 # ============================================================
 
 st.subheader("🧊 Geometrías de coordinación en 3D")
 st.markdown("""
 Aquí se muestra **por defecto** la geometría correspondiente al **NC predicho** (según tus radios *r* y *R*).  
-Si quieres, puedes **explorar** o **comparar todas** (modo didáctico).
+Si quieres, puedes **explorar** (elegir NC) o **comparar todas** (modo didáctico).
 """)
 
 _vertices_por_nc = {
@@ -347,13 +343,12 @@ _vertices_por_nc = {
 
 def _patch_html_para_streamlit(raw_html: str) -> str:
     """
-    Hace el HTML de py3Dmol robusto para Streamlit (iframe srcdoc):
-    - Extrae scripts inline (que usan $3Dmol) y evita que se ejecuten antes de cargar librerías.
-    - Carga jQuery y 3Dmol dentro del iframe con fallback (2 CDNs).
-    - Ejecuta el init original SOLO cuando window.$3Dmol exista.
+    Robustez Streamlit iframe (srcdoc):
+    - Extrae scripts inline de py3Dmol (donde se usa $3Dmol) y los ejecuta SOLO
+      después de cargar 3Dmol dentro del iframe.
+    - NO usa excludeScript (incompatible con tu py3Dmol actual).
     """
-
-    # 1) Extraer todos los scripts inline (sin src=)
+    # 1) Capturar scripts inline (sin src=)
     inline_scripts = re.findall(
         r"<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>",
         raw_html,
@@ -361,7 +356,7 @@ def _patch_html_para_streamlit(raw_html: str) -> str:
     )
     init_code = "\n".join(inline_scripts).strip()
 
-    # 2) Eliminar TODOS los scripts del HTML (inline y externos) para controlar el orden
+    # 2) Quitar todos los scripts del HTML original (controlamos el orden)
     html_sin_scripts = re.sub(
         r"<script[^>]*>.*?</script>",
         "",
@@ -369,7 +364,7 @@ def _patch_html_para_streamlit(raw_html: str) -> str:
         flags=re.IGNORECASE | re.DOTALL
     )
 
-    # Escape seguro para template literal JS
+    # 3) Escapar init_code para template literal JS
     init_code_js = init_code.replace("\\", "\\\\").replace("`", "\\`")
 
     loader = f"""
@@ -398,15 +393,7 @@ def _patch_html_para_streamlit(raw_html: str) -> str:
   }}
 
   try {{
-    // jQuery (por compatibilidad; si ya existe, no recarga)
-    if (!window.jQuery && !window.$) {{
-      await loadWithFallback(
-        "https://code.jquery.com/jquery-3.7.1.min.js",
-        "https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"
-      );
-    }}
-
-    // 3Dmol
+    // 3Dmol dentro del iframe (fallback 2 CDNs)
     if (!window.$3Dmol) {{
       await loadWithFallback(
         "https://cdn.jsdelivr.net/npm/3dmol@1.6.0/build/3Dmol-min.js",
@@ -414,7 +401,7 @@ def _patch_html_para_streamlit(raw_html: str) -> str:
       );
     }}
 
-    // Espera activa (por si tarda un tick en exponer $3Dmol)
+    // Espera breve por exposición de $3Dmol
     let tries = 0;
     while (!window.$3Dmol && tries < 200) {{
       await new Promise(r => setTimeout(r, 25));
@@ -422,41 +409,33 @@ def _patch_html_para_streamlit(raw_html: str) -> str:
     }}
 
     if (!window.$3Dmol) {{
-      console.error("❌ $3Dmol no disponible. Posible bloqueo de CDN/CSP.");
+      console.error("❌ $3Dmol no disponible (bloqueo/red).");
       return;
     }}
 
     // Ejecutar init original de py3Dmol
-    try {{
-      (new Function(initCode))();
-      console.log("✅ 3Dmol init OK");
-    }} catch (e) {{
-      console.error("❌ Error ejecutando initCode:", e);
-    }}
-
+    (new Function(initCode))();
+    console.log("✅ 3Dmol init OK");
   }} catch (e) {{
-    console.error("❌ Error cargando librerías 3D:", e);
+    console.error("❌ Error cargando/inicializando 3Dmol:", e);
   }}
 }})();
 </script>
 """
 
-    # 3) Insertar el loader al final del body si existe, si no, al final del documento
+    # Insertar loader antes del cierre de body si existe
     m_body = re.search(r"</body\s*>", html_sin_scripts, flags=re.IGNORECASE)
     if m_body:
-        patched = html_sin_scripts[:m_body.start()] + loader + html_sin_scripts[m_body.start():]
-    else:
-        patched = html_sin_scripts + loader
-
-    return patched
+        return html_sin_scripts[:m_body.start()] + loader + html_sin_scripts[m_body.start():]
+    return html_sin_scripts + loader
 
 def _make_viewer_html(nc: int, R: float, r: float, etiqueta: str, ancho=560, alto=560) -> str:
+    # Usar tu función existente (segura, sin kwargs raros)
     vertices_norm = _vertices_por_nc[nc]
     view = generar_visor(nc, vertices_norm, R, r, etiqueta, ancho=ancho, alto=alto)
     raw_html = view._make_html()
     return _patch_html_para_streamlit(raw_html)
 
-# Selector de modo
 modo = st.radio(
     "Modo de visualización",
     options=[
@@ -473,10 +452,11 @@ if modo == "Explorar (elegir NC manualmente)":
 else:
     nc_elegido = nc_predicho
 
-# visores para Bloque 11
+# Diccionario para el Bloque 11 (evita KeyError)
 visores = {nc: "" for nc in NC_TIPICOS}
 
 if modo == "Comparar todas (3×2)":
+    # Radios representativos (comparación didáctica)
     R_ANION_FIJO = 1.0
     r_R_representativo = {3: 0.19, 4: 0.30, 6: 0.50, 8: 0.80, 12: 0.90}
 
@@ -493,7 +473,40 @@ if modo == "Comparar todas (3×2)":
         r_rep = r_R_representativo[nc] * R_ANION_FIJO
         visores[nc] = _make_viewer_html(nc, R_ANION_FIJO, r_rep, etiqueta, ancho=450, alto=450)
 
-    # Render principal
+    st.success("Modo comparar activado: se renderizan todas las geometrías (3×2).")
+
+else:
+    # Modo normal: radios del usuario
+    idx = NC_TIPICOS.index(nc_elegido)
+    etiqueta = (
+        f"NC = {nc_elegido}\\n"
+        f"{GEOMETRIAS[idx]}\\n"
+        f"r = {radio_cation:.2f} Å\\n"
+        f"R = {radio_anion:.2f} Å\\n"
+        f"r/R = {relacion_r_R:.3f}"
+    )
+
+    visores[nc_elegido] = _make_viewer_html(nc_elegido, radio_anion, radio_cation, etiqueta, ancho=560, alto=560)
+
+    # Render único
+    if nc_elegido == nc_predicho:
+        st.markdown('<div style="border: 3px solid gold; padding: 8px; border-radius: 12px;">', unsafe_allow_html=True)
+
+    st.markdown(f"### ✅ Geometría mostrada: **NC = {nc_elegido}** · *{GEOMETRIAS[idx]}*")
+    st.components.v1.html(visores[nc_elegido], height=580)
+
+    if nc_elegido == nc_predicho:
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    st.caption("En consola del iframe deberías ver: ✅ 3Dmol init OK")
+
+# ============================================================
+# 11. DISPOSICIÓN EN CUADRÍCULA 3x2 (ARREGLADO: componentes; solo en modo comparar)
+# ============================================================
+
+if modo == "Comparar todas (3×2)":
+    st.subheader("🧩 Cuadrícula 3×2 (comparación didáctica)")
+
     col1, col2 = st.columns(2)
     with col1:
         st.markdown("**NC = 3**  ·  *Triangular*")
@@ -521,37 +534,12 @@ if modo == "Comparar todas (3×2)":
             <p style="text-align: center;">
             <span style="color:blue;">● Catión (central)</span><br>
             <span style="color:red;">● Aniones (coordinados)</span><br><br>
-            <strong>Modo comparar:</strong><br>
-            Se usan radios representativos<br>
-            para cada intervalo r/R.
+            Esta cuadrícula solo aparece en “Comparar” para evitar saturación visual.
             </p>
         </div>
         """, unsafe_allow_html=True)
-
 else:
-    # Modo predicho / explorar: usar radios reales del usuario
-    idx = NC_TIPICOS.index(nc_elegido)
-    etiqueta = (
-        f"NC = {nc_elegido}\\n"
-        f"{GEOMETRIAS[idx]}\\n"
-        f"r = {radio_cation:.2f} Å\\n"
-        f"R = {radio_anion:.2f} Å\\n"
-        f"r/R = {relacion_r_R:.3f}"
-    )
-
-    visores[nc_elegido] = _make_viewer_html(nc_elegido, radio_anion, radio_cation, etiqueta, ancho=560, alto=560)
-
-    st.markdown(f"### ✅ Geometría mostrada: **NC = {nc_elegido}** · *{GEOMETRIAS[idx]}*")
-    st.components.v1.html(visores[nc_elegido], height=580)
-
-    st.caption("Si queda blanco: revisa Console dentro del iframe; el loader imprime '✅ 3Dmol init OK' cuando inicializa.")
-
-# ============================================================
-# 11. DISPOSICIÓN EN CUADRÍCULA 3x2 (ARREGLADO: NO usar st.markdown para visores)
-# ============================================================
-
-if modo != "Comparar todas (3×2)":
-    st.caption("La cuadrícula completa (comparación) aparece solo si eliges **“Comparar todas (3×2)”**.")
+    st.caption("La cuadrícula completa se muestra solo si eliges **“Comparar todas (3×2)”**.")
 # ============================================================
 # 12. LEYENDA DE COLORES Y EXPLICACIÓN TEÓRICA (CORREGIDA)
 # ============================================================
@@ -611,5 +599,6 @@ with st.expander("🎨 Guía de colores y explicación teórica"):
 # 13. PIE DE PÁGINA
 # ============================================================
 st.caption("App desarrollada con fines académicos por HV Martínez-Tejada. Basado en las reglas de radios de Pauling. Visualizaciones 3D con Py3Dmol.")
+
 
 
