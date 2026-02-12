@@ -327,13 +327,16 @@ with col_grafica2:
 # 10. VISUALIZACIONES 3D - FIX robusto ($3Dmol en iframe) + 1 visor por defecto
 # ============================================================
 
+# ============================================================
+# 10. VISUALIZACIONES 3D - FIX robusto ($3Dmol en iframe) + 1 visor por defecto
+# ============================================================
+
 st.subheader("🧊 Geometrías de coordinación en 3D")
 st.markdown("""
 Aquí se muestra **por defecto** la geometría correspondiente al **NC predicho** (según tus radios *r* y *R*).  
 Si quieres, puedes **explorar** o **comparar todas** (modo didáctico).
 """)
 
-# --- Helper: elegir vértices según NC ---
 _vertices_por_nc = {
     3: VERTICES_NC3,
     4: VERTICES_NC4,
@@ -342,39 +345,118 @@ _vertices_por_nc = {
     12: VERTICES_NC12,
 }
 
-# --- Helper: parche HTML para Streamlit (iframe srcdoc) ---
 def _patch_html_para_streamlit(raw_html: str) -> str:
     """
-    Garantiza que dentro del iframe exista $3Dmol:
-    - Inserta SIEMPRE jQuery + 3Dmol-min.js antes del primer <script> del HTML del visor.
-    - Elimina cualquier asignación insegura tipo window.$3Dmol = ... $3Dmol;
+    Hace el HTML de py3Dmol robusto para Streamlit (iframe srcdoc):
+    - Extrae scripts inline (que usan $3Dmol) y evita que se ejecuten antes de cargar librerías.
+    - Carga jQuery y 3Dmol dentro del iframe con fallback (2 CDNs).
+    - Ejecuta el init original SOLO cuando window.$3Dmol exista.
     """
-    # 1) Quitar asignaciones inseguras si vinieran en el HTML
-    raw_html = re.sub(
-        r'window\.\$3Dmol\s*=\s*window\.\$3Dmol\s*\|\|\s*\$3Dmol\s*;?',
-        '',
-        raw_html
+
+    # 1) Extraer todos los scripts inline (sin src=)
+    inline_scripts = re.findall(
+        r"<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>",
+        raw_html,
+        flags=re.IGNORECASE | re.DOTALL
+    )
+    init_code = "\n".join(inline_scripts).strip()
+
+    # 2) Eliminar TODOS los scripts del HTML (inline y externos) para controlar el orden
+    html_sin_scripts = re.sub(
+        r"<script[^>]*>.*?</script>",
+        "",
+        raw_html,
+        flags=re.IGNORECASE | re.DOTALL
     )
 
-    # 2) Insertar librerías antes del primer script (para que carguen antes del init)
-    inject = """
-<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/3dmol@1.6.0/build/3Dmol-min.js"></script>
-"""
-    m = re.search(r"<script", raw_html, flags=re.IGNORECASE)
-    if m:
-        return raw_html[:m.start()] + inject + raw_html[m.start():]
-    return inject + raw_html
+    # Escape seguro para template literal JS
+    init_code_js = init_code.replace("\\", "\\\\").replace("`", "\\`")
 
-# --- Construcción HTML de un visor ---
-def _make_viewer_html(nc: int, R: float, r: float, etiqueta: str, ancho=520, alto=520) -> str:
+    loader = f"""
+<script>
+(async function() {{
+  const initCode = `{init_code_js}`;
+
+  function loadScript(src) {{
+    return new Promise((resolve, reject) => {{
+      const s = document.createElement("script");
+      s.src = src;
+      s.async = false;
+      s.onload = () => resolve(src);
+      s.onerror = () => reject(new Error("Failed: " + src));
+      document.head.appendChild(s);
+    }});
+  }}
+
+  async function loadWithFallback(primary, fallback) {{
+    try {{
+      return await loadScript(primary);
+    }} catch (e1) {{
+      console.warn(e1.message);
+      return await loadScript(fallback);
+    }}
+  }}
+
+  try {{
+    // jQuery (por compatibilidad; si ya existe, no recarga)
+    if (!window.jQuery && !window.$) {{
+      await loadWithFallback(
+        "https://code.jquery.com/jquery-3.7.1.min.js",
+        "https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"
+      );
+    }}
+
+    // 3Dmol
+    if (!window.$3Dmol) {{
+      await loadWithFallback(
+        "https://cdn.jsdelivr.net/npm/3dmol@1.6.0/build/3Dmol-min.js",
+        "https://cdnjs.cloudflare.com/ajax/libs/3Dmol/1.6.0/3Dmol-min.js"
+      );
+    }}
+
+    // Espera activa (por si tarda un tick en exponer $3Dmol)
+    let tries = 0;
+    while (!window.$3Dmol && tries < 200) {{
+      await new Promise(r => setTimeout(r, 25));
+      tries++;
+    }}
+
+    if (!window.$3Dmol) {{
+      console.error("❌ $3Dmol no disponible. Posible bloqueo de CDN/CSP.");
+      return;
+    }}
+
+    // Ejecutar init original de py3Dmol
+    try {{
+      (new Function(initCode))();
+      console.log("✅ 3Dmol init OK");
+    }} catch (e) {{
+      console.error("❌ Error ejecutando initCode:", e);
+    }}
+
+  }} catch (e) {{
+    console.error("❌ Error cargando librerías 3D:", e);
+  }}
+}})();
+</script>
+"""
+
+    # 3) Insertar el loader al final del body si existe, si no, al final del documento
+    m_body = re.search(r"</body\s*>", html_sin_scripts, flags=re.IGNORECASE)
+    if m_body:
+        patched = html_sin_scripts[:m_body.start()] + loader + html_sin_scripts[m_body.start():]
+    else:
+        patched = html_sin_scripts + loader
+
+    return patched
+
+def _make_viewer_html(nc: int, R: float, r: float, etiqueta: str, ancho=560, alto=560) -> str:
     vertices_norm = _vertices_por_nc[nc]
     view = generar_visor(nc, vertices_norm, R, r, etiqueta, ancho=ancho, alto=alto)
-    html = view._make_html()
-    html = _patch_html_para_streamlit(html)
-    return html
+    raw_html = view._make_html()
+    return _patch_html_para_streamlit(raw_html)
 
-# --- Selector de modo (por defecto: SOLO predicha) ---
+# Selector de modo
 modo = st.radio(
     "Modo de visualización",
     options=[
@@ -391,11 +473,10 @@ if modo == "Explorar (elegir NC manualmente)":
 else:
     nc_elegido = nc_predicho
 
-# --- visores debe existir para el Bloque 11 (y evitar KeyError) ---
+# visores para Bloque 11
 visores = {nc: "" for nc in NC_TIPICOS}
 
 if modo == "Comparar todas (3×2)":
-    # Radios representativos por NC para comparación visual
     R_ANION_FIJO = 1.0
     r_R_representativo = {3: 0.19, 4: 0.30, 6: 0.50, 8: 0.80, 12: 0.90}
 
@@ -412,50 +493,27 @@ if modo == "Comparar todas (3×2)":
         r_rep = r_R_representativo[nc] * R_ANION_FIJO
         visores[nc] = _make_viewer_html(nc, R_ANION_FIJO, r_rep, etiqueta, ancho=450, alto=450)
 
-    # Render principal (igual que antes, pero robusto)
+    # Render principal
     col1, col2 = st.columns(2)
     with col1:
-        if 3 == nc_predicho:
-            st.markdown('<div style="border: 3px solid gold; padding: 6px; border-radius: 12px;">', unsafe_allow_html=True)
         st.markdown("**NC = 3**  ·  *Triangular*")
         st.components.v1.html(visores[3], height=450)
-        if 3 == nc_predicho:
-            st.markdown('</div>', unsafe_allow_html=True)
-
     with col2:
-        if 4 == nc_predicho:
-            st.markdown('<div style="border: 3px solid gold; padding: 6px; border-radius: 12px;">', unsafe_allow_html=True)
         st.markdown("**NC = 4**  ·  *Tetraédrica*")
         st.components.v1.html(visores[4], height=450)
-        if 4 == nc_predicho:
-            st.markdown('</div>', unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
     with col1:
-        if 6 == nc_predicho:
-            st.markdown('<div style="border: 3px solid gold; padding: 6px; border-radius: 12px;">', unsafe_allow_html=True)
         st.markdown("**NC = 6**  ·  *Octaédrica*")
         st.components.v1.html(visores[6], height=450)
-        if 6 == nc_predicho:
-            st.markdown('</div>', unsafe_allow_html=True)
-
     with col2:
-        if 8 == nc_predicho:
-            st.markdown('<div style="border: 3px solid gold; padding: 6px; border-radius: 12px;">', unsafe_allow_html=True)
         st.markdown("**NC = 8**  ·  *Cúbica*")
         st.components.v1.html(visores[8], height=450)
-        if 8 == nc_predicho:
-            st.markdown('</div>', unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
     with col1:
-        if 12 == nc_predicho:
-            st.markdown('<div style="border: 3px solid gold; padding: 6px; border-radius: 12px;">', unsafe_allow_html=True)
         st.markdown("**NC = 12**  ·  *Cuboctaédrica (Compacta)*")
         st.components.v1.html(visores[12], height=450)
-        if 12 == nc_predicho:
-            st.markdown('</div>', unsafe_allow_html=True)
-
     with col2:
         st.markdown("""
         <div style="background-color: #f0f2f6; padding: 20px; border-radius: 10px; height: 450px; display: flex; flex-direction: column; justify-content: center;">
@@ -465,8 +523,7 @@ if modo == "Comparar todas (3×2)":
             <span style="color:red;">● Aniones (coordinados)</span><br><br>
             <strong>Modo comparar:</strong><br>
             Se usan radios representativos<br>
-            para cada intervalo r/R.<br><br>
-            <em>En NC=12 se muestran solo 6 enlaces<br>para no saturar la escena.</em>
+            para cada intervalo r/R.
             </p>
         </div>
         """, unsafe_allow_html=True)
@@ -482,67 +539,19 @@ else:
         f"r/R = {relacion_r_R:.3f}"
     )
 
-    visores[nc_elegido] = _make_viewer_html(
-        nc_elegido, radio_anion, radio_cation, etiqueta, ancho=560, alto=560
-    )
-
-    highlight = (nc_elegido == nc_predicho)
-    if highlight:
-        st.markdown('<div style="border: 3px solid gold; padding: 8px; border-radius: 12px;">', unsafe_allow_html=True)
+    visores[nc_elegido] = _make_viewer_html(nc_elegido, radio_anion, radio_cation, etiqueta, ancho=560, alto=560)
 
     st.markdown(f"### ✅ Geometría mostrada: **NC = {nc_elegido}** · *{GEOMETRIAS[idx]}*")
     st.components.v1.html(visores[nc_elegido], height=580)
 
-    if highlight:
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    st.caption("Si ves blanco: abre DevTools → Network y confirma que 3Dmol-min.js carga (status 200) dentro del iframe.")
+    st.caption("Si queda blanco: revisa Console dentro del iframe; el loader imprime '✅ 3Dmol init OK' cuando inicializa.")
 
 # ============================================================
-# 11. DISPOSICIÓN EN CUADRÍCULA 3x2 (ARREGLADO: usar componentes; sin duplicar por defecto)
+# 11. DISPOSICIÓN EN CUADRÍCULA 3x2 (ARREGLADO: NO usar st.markdown para visores)
 # ============================================================
 
-if modo == "Comparar todas (3×2)":
-    st.subheader("🧩 Cuadrícula 3×2 (comparación didáctica)")
-
-    # Fila 1
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown("**NC = 3**  ·  *Triangular*")
-        st.components.v1.html(visores[3], height=450)
-    with col2:
-        st.markdown("**NC = 4**  ·  *Tetraédrica*")
-        st.components.v1.html(visores[4], height=450)
-
-    # Fila 2
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown("**NC = 6**  ·  *Octaédrica*")
-        st.components.v1.html(visores[6], height=450)
-    with col2:
-        st.markdown("**NC = 8**  ·  *Cúbica*")
-        st.components.v1.html(visores[8], height=450)
-
-    # Fila 3
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown("**NC = 12**  ·  *Cuboctaédrica (Compacta)*")
-        st.components.v1.html(visores[12], height=450)
-    with col2:
-        st.markdown("""
-        <div style="background-color: #f0f2f6; padding: 20px; border-radius: 10px; height: 450px; display: flex; flex-direction: column; justify-content: center;">
-            <h4 style="text-align: center;">📘 Información</h4>
-            <p style="text-align: center;">
-            <span style="color:blue;">● Catión (central)</span><br>
-            <span style="color:red;">● Aniones (coordinados)</span><br><br>
-            <strong>Nota:</strong><br>
-            Esta cuadrícula solo aparece en “Comparar todas”<br>
-            para evitar saturación visual en modo normal.
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-else:
-    st.caption("La cuadrícula completa (Bloque 11) se muestra solo si eliges **“Comparar todas (3×2)”**.")
+if modo != "Comparar todas (3×2)":
+    st.caption("La cuadrícula completa (comparación) aparece solo si eliges **“Comparar todas (3×2)”**.")
 # ============================================================
 # 12. LEYENDA DE COLORES Y EXPLICACIÓN TEÓRICA (CORREGIDA)
 # ============================================================
@@ -602,4 +611,5 @@ with st.expander("🎨 Guía de colores y explicación teórica"):
 # 13. PIE DE PÁGINA
 # ============================================================
 st.caption("App desarrollada con fines académicos por HV Martínez-Tejada. Basado en las reglas de radios de Pauling. Visualizaciones 3D con Py3Dmol.")
+
 
