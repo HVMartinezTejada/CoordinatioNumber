@@ -9,6 +9,10 @@ import py3Dmol
 # 1. CONFIGURACIÓN INICIAL
 # ============================================================
 st.set_page_config(page_title="Simulador r/R - NC", layout="wide")
+st.markdown(
+    '<script src="https://cdn.jsdelivr.net/npm/3dmol@1.6.0/build/3Dmol.js"></script>',
+    unsafe_allow_html=True
+)
 st.title("📐 Simulador de Relación de Radios y Número de Coordinación")
 st.markdown("""
 **Teoría:** Esta app visualiza cómo la relación entre el radio del catión (r) y el anión (R) 
@@ -504,6 +508,7 @@ with st.expander("🎨 Guía de colores y explicación teórica"):
 # 12. PIE DE PÁGINA
 # ============================================================
 st.caption("App desarrollada con fines académicos por HV Martínez-Tejada. Basado en las reglas de radios de Pauling. Visualizaciones 3D con Py3Dmol.")
+
 
 
 
