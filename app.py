@@ -7,39 +7,21 @@ import py3Dmol
 import re
 
 # ============================================================
-# 1. CONFIGURACIÓN INICIAL Y CARGA GLOBAL DE 3DMOL.JS (con reintento)
+# 1. CONFIGURACIÓN INICIAL Y CARGA GLOBAL DE 3DMOL.JS
 # ============================================================
 st.set_page_config(page_title="Simulador r/R - NC", layout="wide")
 
-# Cargar 3Dmol.js UNA VEZ para toda la app (con reintento)
-st.markdown("""
-<script>
-    (function load3Dmol() {
-        if (typeof $3Dmol !== 'undefined') {
-            console.log('✅ 3Dmol.js ya está cargado');
-            return;
-        }
-        console.log('⏳ Cargando 3Dmol.js desde cdnjs...');
-        var script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/3Dmol/1.6.0/3Dmol.js';
-        script.onload = function() {
-            console.log('✅ 3Dmol.js cargado correctamente');
-            window.$3Dmol = window.$3Dmol || $3Dmol;
-        };
-        script.onerror = function() {
-            console.error('❌ Error al cargar 3Dmol.js desde cdnjs, reintentando con jsDelivr...');
-            var script2 = document.createElement('script');
-            script2.src = 'https://cdn.jsdelivr.net/npm/3dmol@1.6.0/build/3Dmol.js';
-            script2.onload = function() {
-                console.log('✅ 3Dmol.js cargado desde jsDelivr');
-                window.$3Dmol = window.$3Dmol || $3Dmol;
-            };
-            document.head.appendChild(script2);
-        };
-        document.head.appendChild(script);
-    })();
-</script>
-""", unsafe_allow_html=True)
+# Cargar 3Dmol.js UNA VEZ para toda la app
+st.markdown(
+    """
+    <script src="https://cdn.jsdelivr.net/npm/3dmol@1.6.0/build/3Dmol.js"></script>
+    <script>
+        // Asegurar disponibilidad global
+        window.$3Dmol = window.$3Dmol || $3Dmol;
+    </script>
+    """,
+    unsafe_allow_html=True
+)
 
 st.title("📐 Simulador de Relación de Radios y Número de Coordinación")
 st.markdown("""
@@ -58,10 +40,13 @@ GEOMETRIAS = ["Triangular", "Tetraédrica", "Octaédrica", "Cúbica", "Cuboctaé
 colors = [cm.viridis(i / (len(NC_TIPICOS) - 1)) for i in range(len(NC_TIPICOS))]
 
 # ============================================================
-# 3. FUNCIÓN PARA GENERAR VISOR 3D
+# 3. FUNCIÓN PARA GENERAR VISOR 3D (sin cambios)
 # ============================================================
 def generar_visor(nc, vertices_norm, radio_anion, radio_cation, texto_etiqueta,
                   ancho=450, alto=450):
+    """
+    Crea un visor py3Dmol independiente con la geometría de coordinación.
+    """
     distancia_centro = radio_anion + radio_cation
     vertices = [[v * distancia_centro for v in pos] for pos in vertices_norm]
     
@@ -339,122 +324,177 @@ with col_grafica2:
     st.pyplot(fig2)
 
 # ============================================================
-# 10. VISUALIZACIONES 3D - VERSIÓN ÚNICA Y OPTIMIZADA
+# 10. VISUALIZACIONES 3D - (ACTUALIZADO: 1 visor por defecto + JS robusto en iframe)
 # ============================================================
 
 st.subheader("🧊 Geometrías de coordinación en 3D")
 st.markdown("""
-Cada visor muestra un poliedro de coordinación con **aniones rojos** y **catión azul central**.  
-Los tamaños relativos corresponden a los valores típicos de r/R dentro de cada intervalo.  
-Puedes rotar, desplazar y hacer zoom con el mouse.
+Aquí se muestra **por defecto** la geometría 3D correspondiente al **NC predicho** (según tus radios r y R).  
+Opcionalmente puedes **explorar otra geometría** o **comparar todas** (modo didáctico).
 """)
 
-# ------------------------------------------------------------
-# PARÁMETROS FIJOS PARA LAS VISUALIZACIONES
-# ------------------------------------------------------------
-R_ANION_FIJO = 1.0
-r_R_representativo = {
-    3: 0.19,
-    4: 0.30,
-    6: 0.50,
-    8: 0.80,
-    12: 0.90
+# --- Helper: elegir vértices según NC ---
+_vertices_por_nc = {
+    3: VERTICES_NC3,
+    4: VERTICES_NC4,
+    6: VERTICES_NC6,
+    8: VERTICES_NC8,
+    12: VERTICES_NC12
 }
 
-visores = {}
+# --- Helper: parche HTML para Streamlit (iframe) ---
+def _patch_html_para_streamlit(raw_html: str) -> str:
+    """
+    Hace el HTML más robusto en Streamlit:
+    - Asegura jQuery (muchos HTMLs de py3Dmol usan $(...))
+    - Asegura 3Dmol.js dentro del iframe (no depender del 'global' de la página)
+    """
+    jquery_src = "https://code.jquery.com/jquery-3.7.1.min.js"
+    mol_src = "https://cdn.jsdelivr.net/npm/3dmol@1.6.0/build/3Dmol-min.js"
 
-for nc in NC_TIPICOS:
-    r_cat = r_R_representativo[nc] * R_ANION_FIJO
-    idx = NC_TIPICOS.index(nc)
+    jquery_tag = f'<script src="{jquery_src}"></script>'
+    mol_tag = f'<script src="{mol_src}"></script>'
+    assign_tag = "<script>window.$3Dmol = window.$3Dmol || $3Dmol;</script>"
 
-    # Texto del intervalo
-    if nc == 3:
-        intervalo = "0.155–0.225"
-    elif nc == 12:
-        intervalo = ">0.732"
+    # Evitar duplicados si ya vienen en el HTML
+    need_jq = ("jquery" not in raw_html.lower()) and ("$" in raw_html or "jQuery" in raw_html)
+    need_mol = ("3dmol" not in raw_html.lower())  # amplio; si ya lo trae, no añadimos
+
+    inject = []
+    if need_jq:
+        inject.append(jquery_tag)
+    if need_mol:
+        inject.append(mol_tag)
+    inject.append(assign_tag)
+
+    inject_block = "\n".join(inject) + "\n"
+
+    if "<head>" in raw_html:
+        raw_html = raw_html.replace("<head>", "<head>\n" + inject_block, 1)
     else:
-        intervalo = f"{LIMITES_NC[idx-1]:.3f}–{LIMITES_NC[idx]:.3f}"
+        raw_html = inject_block + raw_html
 
-    etiqueta = f"NC = {nc}\n{GEOMETRIAS[idx]}\nr/R: {intervalo}"
+    return raw_html
 
-    # Vértices según NC
-    if nc == 3:
-        vertices = VERTICES_NC3
-    elif nc == 4:
-        vertices = VERTICES_NC4
-    elif nc == 6:
-        vertices = VERTICES_NC6
-    elif nc == 8:
-        vertices = VERTICES_NC8
-    elif nc == 12:
-        vertices = VERTICES_NC12
+# --- Selector de modo (por defecto: SOLO predicha) ---
+modo = st.radio(
+    "Modo de visualización",
+    options=[
+        "Mostrar solo la estructura predicha (según r/R)",
+        "Explorar (elegir NC manualmente)",
+        "Comparar todas (3×2)"
+    ],
+    index=0,
+    horizontal=True
+)
 
-    # 🔧 Generar visor (sin parámetros problemáticos)
-    view = py3Dmol.view(width=450, height=450)
-    
-    distancia_centro = R_ANION_FIJO + r_cat
-    vertices_escalados = [[v * distancia_centro for v in pos] for pos in vertices]
-    
-    for v in vertices_escalados:
-        view.addSphere({
-            'center': {'x': v[0], 'y': v[1], 'z': v[2]},
-            'radius': R_ANION_FIJO,
-            'color': 'red',
-            'alpha': 0.8,
-            'wireframe': False
-        })
-    
-    view.addSphere({
-        'center': {'x': 0, 'y': 0, 'z': 0},
-        'radius': r_cat,
-        'color': 'blue',
-        'alpha': 1.0,
-        'wireframe': False
-    })
-    
-    enlaces_mostrar = vertices_escalados[:6] if nc == 12 else vertices_escalados
-    for v in enlaces_mostrar:
-        view.addCylinder({
-            'start': {'x': 0, 'y': 0, 'z': 0},
-            'end': {'x': v[0], 'y': v[1], 'z': v[2]},
-            'radius': 0.05,
-            'color': 'gray'
-        })
-    
-    max_z = max([p[2] for p in vertices_escalados] + [0])
-    view.addLabel(etiqueta, {
-        'position': {'x': 0, 'y': 0, 'z': max_z + 2.2},
-        'fontSize': 16,
-        'fontColor': 'black',
-        'backgroundColor': 'white',
-        'backgroundOpacity': 0.8,
-        'inFront': True
-    })
-    
-    view.setView({
-        'fov': 35,
-        'position': [0, 0, distancia_centro * 3.5],
-        'up': [0, 1, 0]
-    })
-    view.zoomTo()
+if modo == "Explorar (elegir NC manualmente)":
+    nc_elegido = st.selectbox("Selecciona un NC para explorar", NC_TIPICOS, index=NC_TIPICOS.index(nc_predicho))
+else:
+    nc_elegido = nc_predicho
 
-    # 🔥 OBTENER HTML Y APLICAR PARCHES DEFINITIVOS
-    html = view._make_html()
-    
-    # 1. Cambiar CDN por una más confiable (cdnjs)
-    html = html.replace(
-        "https://3dmol.org/build/3Dmol.js",
-        "https://cdnjs.cloudflare.com/ajax/libs/3Dmol/1.6.0/3Dmol.js"
+# --- visores debe existir para Bloque 11 (sin tocarlo) ---
+#     Para evitar errores, inicializamos todas las claves con string vacío.
+visores = {nc: "" for nc in NC_TIPICOS}
+
+def _construir_html_visor(nc: int, R: float, r: float, etiqueta: str, ancho=520, alto=520) -> str:
+    vertices_norm = _vertices_por_nc[nc]
+    view = generar_visor(nc, vertices_norm, R, r, etiqueta, ancho=ancho, alto=alto)
+    raw_html = view._make_html()
+    return _patch_html_para_streamlit(raw_html)
+
+# --- Construcción (solo lo necesario) ---
+if modo == "Comparar todas (3×2)":
+    # Radios representativos por NC para comparación visual (evita distorsión extrema)
+    R_ANION_FIJO = 1.0
+    r_R_representativo = {3: 0.19, 4: 0.30, 6: 0.50, 8: 0.80, 12: 0.90}
+
+    for nc in NC_TIPICOS:
+        idx = NC_TIPICOS.index(nc)
+        if nc == 3:
+            intervalo = "0.155–0.225"
+        elif nc == 12:
+            intervalo = ">0.732"
+        else:
+            intervalo = f"{LIMITES_NC[idx-1]:.3f}–{LIMITES_NC[idx]:.3f}"
+
+        etiqueta = f"NC = {nc}\\n{GEOMETRIAS[idx]}\\nr/R: {intervalo}"
+        r_rep = r_R_representativo[nc] * R_ANION_FIJO
+        visores[nc] = _construir_html_visor(nc, R_ANION_FIJO, r_rep, etiqueta, ancho=450, alto=450)
+
+    # --- Render 3×2 con iframes (robusto) ---
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("**NC = 3**  ·  *Triangular*")
+        st.components.v1.html(visores[3], height=450)
+    with col2:
+        st.markdown("**NC = 4**  ·  *Tetraédrica*")
+        st.components.v1.html(visores[4], height=450)
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("**NC = 6**  ·  *Octaédrica*")
+        st.components.v1.html(visores[6], height=450)
+    with col2:
+        st.markdown("**NC = 8**  ·  *Cúbica*")
+        st.components.v1.html(visores[8], height=450)
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("**NC = 12**  ·  *Cuboctaédrica (Compacta)*")
+        st.components.v1.html(visores[12], height=450)
+    with col2:
+        st.markdown("""
+        <div style="background-color: #f0f2f6; padding: 20px; border-radius: 10px; height: 450px; display: flex; flex-direction: column; justify-content: center;">
+            <h4 style="text-align: center;">📘 Información</h4>
+            <p style="text-align: center;">
+            <span style="color:blue;">● Catión (central)</span><br>
+            <span style="color:red;">● Aniones (coordinados)</span><br><br>
+            <strong>Modo comparar:</strong><br>
+            Se usan radios representativos<br>
+            para cada intervalo r/R.<br><br>
+            <em>El visor NC=12 muestra solo 6 enlaces<br>para no saturar la escena.</em>
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+else:
+    # --- Modo predicho / explorar: usar los radios del usuario ---
+    idx = NC_TIPICOS.index(nc_elegido)
+    etiqueta = (
+        f"NC = {nc_elegido}\\n"
+        f"{GEOMETRIAS[idx]}\\n"
+        f"r = {radio_cation:.2f} Å\\n"
+        f"R = {radio_anion:.2f} Å\\n"
+        f"r/R = {relacion_r_R:.3f}"
     )
-    
-    # 2. Reemplazar TODAS las referencias a IDs numéricos (¡solución al error de selector!)
-    html = re.sub(r'3dmolviewer_(\d+)', r'viewer_\1', html)
-    
-    visores[nc] = html
 
-# ------------------------------------------------------------
-# 🖼️ CUADRÍCULA 3x2 - SOLO UNA VEZ, CON iframe (MÁS ROBUSTO)
-# ------------------------------------------------------------
+    # Construimos SOLO el visor elegido y lo guardamos también en visores[nc_elegido]
+    visores[nc_elegido] = _construir_html_visor(
+        nc_elegido,
+        radio_anion,
+        radio_cation,
+        etiqueta,
+        ancho=520,
+        alto=520
+    )
+
+    # Render único (con borde dorado si coincide con el predicho)
+    highlight = (nc_elegido == nc_predicho)
+    if highlight:
+        st.markdown('<div style="border: 3px solid gold; padding: 8px; border-radius: 12px;">', unsafe_allow_html=True)
+
+    st.markdown(f"### ✅ Geometría mostrada: **NC = {nc_elegido}** · *{GEOMETRIAS[idx]}*")
+    st.components.v1.html(visores[nc_elegido], height=540)
+
+    if highlight:
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    st.caption("Tip: rota, desplaza y haz zoom con el mouse. Si no ves nada, revisa la consola del navegador por errores JS (p. ej., '$ is not defined').")
+
+# ============================================================
+# 11. DISPOSICIÓN EN CUADRÍCULA 3x2 (CON ÍNDICES CORREGIDOS)
+# ============================================================
 
 # Fila 1: NC = 3 y NC = 4
 col1, col2 = st.columns(2)
@@ -462,7 +502,7 @@ with col1:
     if 3 == nc_predicho:
         st.markdown('<div style="border: 3px solid gold; padding: 5px; border-radius: 10px;">', unsafe_allow_html=True)
     st.markdown("**NC = 3**  ·  *Triangular*")
-    st.components.v1.html(visores[3], height=450)
+    st.markdown(visores[3], unsafe_allow_html=True)   # ← ANTES ERA visores[6] (ERROR)
     if 3 == nc_predicho:
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -470,7 +510,7 @@ with col2:
     if 4 == nc_predicho:
         st.markdown('<div style="border: 3px solid gold; padding: 5px; border-radius: 10px;">', unsafe_allow_html=True)
     st.markdown("**NC = 4**  ·  *Tetraédrica*")
-    st.components.v1.html(visores[4], height=450)
+    st.markdown(visores[4], unsafe_allow_html=True)
     if 4 == nc_predicho:
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -480,7 +520,7 @@ with col1:
     if 6 == nc_predicho:
         st.markdown('<div style="border: 3px solid gold; padding: 5px; border-radius: 10px;">', unsafe_allow_html=True)
     st.markdown("**NC = 6**  ·  *Octaédrica*")
-    st.components.v1.html(visores[6], height=450)
+    st.markdown(visores[6], unsafe_allow_html=True)
     if 6 == nc_predicho:
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -488,7 +528,7 @@ with col2:
     if 8 == nc_predicho:
         st.markdown('<div style="border: 3px solid gold; padding: 5px; border-radius: 10px;">', unsafe_allow_html=True)
     st.markdown("**NC = 8**  ·  *Cúbica*")
-    st.components.v1.html(visores[8], height=450)
+    st.markdown(visores[8], unsafe_allow_html=True)
     if 8 == nc_predicho:
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -498,7 +538,7 @@ with col1:
     if 12 == nc_predicho:
         st.markdown('<div style="border: 3px solid gold; padding: 5px; border-radius: 10px;">', unsafe_allow_html=True)
     st.markdown("**NC = 12**  ·  *Cuboctaédrica (Compacta)*")
-    st.components.v1.html(visores[12], height=450)
+    st.markdown(visores[12], unsafe_allow_html=True)
     if 12 == nc_predicho:
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -519,7 +559,7 @@ with col2:
     """, unsafe_allow_html=True)
 
 # ============================================================
-# 11. LEYENDA DE COLORES Y EXPLICACIÓN TEÓRICA
+# 12. LEYENDA DE COLORES Y EXPLICACIÓN TEÓRICA (CORREGIDA)
 # ============================================================
 with st.expander("🎨 Guía de colores y explicación teórica"):
     col_col1, col_col2, col_col3, col_col4, col_col5 = st.columns(5)
@@ -574,6 +614,6 @@ with st.expander("🎨 Guía de colores y explicación teórica"):
     """)
 
 # ============================================================
-# 12. PIE DE PÁGINA
+# 13. PIE DE PÁGINA
 # ============================================================
 st.caption("App desarrollada con fines académicos por HV Martínez-Tejada. Basado en las reglas de radios de Pauling. Visualizaciones 3D con Py3Dmol.")
