@@ -3,23 +3,18 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import numpy as np
-#import py3Dmol
-#import re
-import uuid
 import json
-
 
 # ============================================================
 # 1. CONFIGURACIÓN INICIAL Y CARGA GLOBAL DE 3DMOL.JS
 # ============================================================
 st.set_page_config(page_title="Simulador r/R - NC", layout="wide")
 
-# Cargar 3Dmol.js UNA VEZ para toda la app
+# (Opcional) Carga global. El visor real está embebido en iframes y vuelve a cargar scripts dentro.
 st.markdown(
     """
     <script src="https://cdn.jsdelivr.net/npm/3dmol@1.6.0/build/3Dmol.js"></script>
     <script>
-        // Asegurar disponibilidad global
         window.$3Dmol = window.$3Dmol || $3Dmol;
     </script>
     """,
@@ -43,64 +38,7 @@ GEOMETRIAS = ["Triangular", "Tetraédrica", "Octaédrica", "Cúbica", "Cuboctaé
 colors = [cm.viridis(i / (len(NC_TIPICOS) - 1)) for i in range(len(NC_TIPICOS))]
 
 # ============================================================
-# 3. FUNCIÓN PARA GENERAR VISOR 3D (sin cambios)
-# ============================================================
-def generar_visor(nc, vertices_norm, radio_anion, radio_cation, texto_etiqueta,
-                  ancho=450, alto=450):
-    """
-    Crea un visor py3Dmol independiente con la geometría de coordinación.
-    """
-    distancia_centro = radio_anion + radio_cation
-    vertices = [[v * distancia_centro for v in pos] for pos in vertices_norm]
-    
-    view = py3Dmol.view(width=ancho, height=alto)
-    
-    for v in vertices:
-        view.addSphere({
-            'center': {'x': v[0], 'y': v[1], 'z': v[2]},
-            'radius': radio_anion,
-            'color': 'red',
-            'alpha': 0.8,
-            'wireframe': False
-        })
-    
-    view.addSphere({
-        'center': {'x': 0, 'y': 0, 'z': 0},
-        'radius': radio_cation,
-        'color': 'blue',
-        'alpha': 1.0,
-        'wireframe': False
-    })
-    
-    enlaces_mostrar = vertices[:6] if nc == 12 else vertices
-    for v in enlaces_mostrar:
-        view.addCylinder({
-            'start': {'x': 0, 'y': 0, 'z': 0},
-            'end': {'x': v[0], 'y': v[1], 'z': v[2]},
-            'radius': 0.05,
-            'color': 'gray'
-        })
-    
-    max_z = max([p[2] for p in vertices] + [0])
-    view.addLabel(texto_etiqueta, {
-        'position': {'x': 0, 'y': 0, 'z': max_z + 2.2},
-        'fontSize': 16,
-        'fontColor': 'black',
-        'backgroundColor': 'white',
-        'backgroundOpacity': 0.8,
-        'inFront': True
-    })
-    
-    view.setView({
-        'fov': 35,
-        'position': [0, 0, distancia_centro * 3.5],
-        'up': [0, 1, 0]
-    })
-    view.zoomTo()
-    return view
-
-# ============================================================
-# 4. DEFINICIÓN DE VÉRTICES NORMALIZADOS (distancia = 1)
+# 3. DEFINICIÓN DE VÉRTICES NORMALIZADOS (distancia = 1)
 # ============================================================
 VERTICES_NC3 = [
     [1.0, 0.0, 0.0],
@@ -134,29 +72,29 @@ for i in range(3):
         for s2 in [-1, 1]:
             v = [0, 0, 0]
             v[i] = s1
-            v[(i+1)%3] = s2
+            v[(i+1) % 3] = s2
             VERTICES_NC12.append(v[:])
 VERTICES_NC12 = [[v[0]/2**0.5, v[1]/2**0.5, v[2]/2**0.5] for v in VERTICES_NC12]
 
 # ============================================================
-# 5. INTERFAZ DE USUARIO (Sidebar)
+# 4. INTERFAZ DE USUARIO (Sidebar)
 # ============================================================
 with st.sidebar:
     st.header("⚙️ Controles de los Radios Iónicos")
     st.caption("Ajusta los valores en Ångströms (Å).")
-    
+
     radio_cation = st.slider(
         "Radio del Catión (r) [Å]",
         min_value=0.1, max_value=2.0, value=1.0, step=0.01,
         help="Selecciona el radio del catión central. Este valor permanecerá constante."
     )
-    
+
     radio_anion = st.slider(
         "Radio del Anión (R) [Å]",
         min_value=0.1, max_value=7.0, value=1.4, step=0.01,
         help="Varía este control para simular aniones de diferente tamaño. Observa cómo cambia r/R y el NC."
     )
-    
+
     st.divider()
     st.header("🔍 Ajustes de zoom vertical (gráfica derecha)")
     y_max_zoom = st.slider(
@@ -175,7 +113,7 @@ with st.sidebar:
         st.rerun()
 
 # ============================================================
-# 6. CÁLCULO PRINCIPAL
+# 5. CÁLCULO PRINCIPAL
 # ============================================================
 relacion_r_R = radio_cation / radio_anion if radio_anion > 0 else 0
 
@@ -189,7 +127,7 @@ for i, limite in enumerate(LIMITES_NC):
         break
 
 # ============================================================
-# 7. VISUALIZACIÓN DE RESULTADOS (métricas)
+# 6. VISUALIZACIÓN DE RESULTADOS (métricas)
 # ============================================================
 col1, col2, col3 = st.columns(3)
 with col1:
@@ -200,7 +138,7 @@ with col3:
     st.metric(label="Geometría", value=geometria_predicha)
 
 # ============================================================
-# 8. BARRA DE PROGRESO Y TABLA DE LÍMITES
+# 7. BARRA DE PROGRESO Y TABLA DE LÍMITES
 # ============================================================
 st.subheader("📊 Umbrales de Estabilidad para cada NC")
 df_limites = pd.DataFrame({
@@ -218,7 +156,7 @@ marcadores = " | ".join([f"{limite:.3f} (NC={nc})" for limite, nc in zip(LIMITES
 st.caption(f"**Límites:** {marcadores}")
 
 # ============================================================
-# 9. GRÁFICOS INTERACTIVOS (dos columnas)
+# 8. GRÁFICOS INTERACTIVOS (dos columnas)
 # ============================================================
 st.subheader("📈 Relación entre R y r/R")
 
@@ -236,12 +174,12 @@ with col_grafica1:
                 label=f'Valor actual ({relacion_r_R:.2f})')
     ax1.axvline(x=radio_anion, color='g', linestyle='--', alpha=0.7, linewidth=1.5,
                 label=f'R actual ({radio_anion:.2f} Å)')
-    
+
     for i, nc in enumerate(NC_TIPICOS):
         y_min = 0 if i == 0 else LIMITES_NC[i-1]
         y_max = LIMITES_NC[i]
         ax1.axhspan(y_min, y_max, alpha=0.25, color=colors[i], label=f'NC {nc}')
-    
+
     ax1.text(0.98, 0.02,
              "Nota: Esta región (r/R > 1.2) es\nmatemáticamente correcta pero\nfísicamente no aplicable al modelo\nde esferas rígidas.",
              transform=ax1.transAxes,
@@ -249,7 +187,7 @@ with col_grafica1:
              verticalalignment='bottom',
              horizontalalignment='right',
              bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.8))
-    
+
     ax1.set_xlabel('Radio del Anión (R) [Å]', fontsize=12)
     ax1.set_ylabel('Relación r/R', fontsize=12)
     ax1.set_title(f'Variación de r/R para r = {radio_cation} Å constante', fontsize=14, pad=15)
@@ -260,11 +198,11 @@ with col_grafica1:
 # --- GRÁFICA 2: Vista de zoom dinámico ---
 with col_grafica2:
     st.markdown("**Vista de zoom – análisis detallado (gráfica principal)**")
-    
+
     margen = 1.0
     x_min = max(0.1, radio_anion - margen)
     x_max = radio_anion + margen
-    
+
     indices = [i for i, R in enumerate(R_range_full) if x_min <= R <= x_max]
     if len(indices) == 0:
         R_range_zoom = [x_min, x_max]
@@ -272,51 +210,51 @@ with col_grafica2:
     else:
         R_range_zoom = [R_range_full[i] for i in indices]
         r_R_range_zoom = [r_R_range_full[i] for i in indices]
-    
+
     fig2, ax2 = plt.subplots(figsize=(8, 5))
     ax2.plot(R_range_zoom, r_R_range_zoom, 'b-', linewidth=2.5, label='r/R')
     ax2.axhline(y=relacion_r_R, color='r', linestyle='--', alpha=0.7, linewidth=1.5,
                 label=f'Valor actual ({relacion_r_R:.2f})')
     ax2.axvline(x=radio_anion, color='g', linestyle='--', alpha=0.7, linewidth=1.5,
                 label=f'R actual ({radio_anion:.2f} Å)')
-    
+
     R_transicion = radio_cation / 0.225
     if x_min <= R_transicion <= x_max:
         ax2.axvline(x=R_transicion, color='purple', linestyle='-.', linewidth=1.8, alpha=0.9,
                     label=f'Transición 2D/3D (R={R_transicion:.2f} Å)')
     ax2.axhline(y=0.225, color='purple', linestyle='-.', linewidth=1.8, alpha=0.9,
                 label='Límite 2D/3D (r/R = 0.225)')
-    
+
     ax2.axhspan(0.155, 0.225, alpha=0.4, color='#555555', hatch='///',
                 label='Región 2D (NC=3, planar)')
     if y_max_zoom > 0.19:
         ax2.text(x_min + 0.1, 0.19, '2D', fontsize=11, weight='bold', color='white',
                  bbox=dict(boxstyle='round', facecolor='#555555', alpha=0.8))
-    
+
     ax2.axhspan(0.225, 0.414, alpha=0.35, color=colors[1], label='NC 4')
     ax2.axhspan(0.414, 0.732, alpha=0.35, color=colors[2], label='NC 6')
     ax2.axhspan(0.732, 1.000, alpha=0.35, color=colors[3], label='NC 8')
     if y_max_zoom > 1.0:
         ax2.axhspan(1.000, y_max_zoom, alpha=0.35, color=colors[4], label='NC 12')
-    
+
     if y_max_zoom > 0.30:
         ax2.text(x_min + 0.1, 0.30, '3D', fontsize=11, weight='bold', color='white',
                  bbox=dict(boxstyle='round', facecolor=colors[1], alpha=0.8))
-    
+
     ax2.axhline(y=0.155, color='black', linestyle='-', linewidth=1.0, alpha=0.5)
     ax2.axhline(y=0.225, color='black', linestyle='-', linewidth=1.0, alpha=0.5)
-    
+
     if y_max_zoom > 0.155:
         ax2.text(x_max - 0.05, 0.155, 'NC=3', fontsize=8, color='black',
                  verticalalignment='bottom', horizontalalignment='right')
     if y_max_zoom > 0.225:
         ax2.text(x_max - 0.05, 0.225, 'NC=4', fontsize=8, color='black',
                  verticalalignment='bottom', horizontalalignment='right')
-    
+
     for limite in [0.414, 0.732, 1.000]:
         if limite <= y_max_zoom:
             ax2.axhline(y=limite, color='gray', linestyle=':', alpha=0.4, linewidth=0.8)
-    
+
     ax2.set_ylim(y_min_zoom, y_max_zoom)
     ax2.set_xlim(x_min, x_max)
     ax2.set_xlabel('Radio del Anión (R) [Å]', fontsize=12)
@@ -325,10 +263,10 @@ with col_grafica2:
     ax2.legend(loc='upper right', fontsize=8)
     ax2.grid(alpha=0.3)
     st.pyplot(fig2)
-# ============================================================
-# 10. VISUALIZACIONES 3D — Embedding directo (SIN py3Dmol)
-# ============================================================
 
+# ============================================================
+# 9. VISUALIZACIONES 3D — Embedding directo (SIN py3Dmol)
+# ============================================================
 st.subheader("🧊 Geometrías de coordinación en 3D")
 st.markdown("""
 Aquí se muestra **por defecto** la geometría correspondiente al **NC predicho** (según tus radios *r* y *R*).  
@@ -350,7 +288,7 @@ def _xyz_from_vertices(nc: int, vertices_norm, R: float, r: float) -> tuple[str,
 
     n_atoms = nc + 1
     lines = [str(n_atoms), f"NC={nc} ionic coordination (Na center, Cl ligands)"]
-    lines.append(f"Na 0.00000 0.00000 0.00000")
+    lines.append("Na 0.00000 0.00000 0.00000")
     for (x, y, z) in vertices:
         lines.append(f"Cl {x:.5f} {y:.5f} {z:.5f}")
 
@@ -360,11 +298,13 @@ def _make_3dmol_embed_html(nc: int, R: float, r: float, etiqueta: str, ancho=560
     """
     Embedding canónico con viewer_3Dmoljs:
     - Carga 3Dmol-min.js + 3Dmol.ui-min.js
-    - Inserta XYZ oculto
-    - Usa data-callback para aplicar estilos con radios reales (sphere.radius)
+    - Inserta XYZ oculto (para que zoomTo() tenga "extent")
+    - Dibuja ESFERAS como SHAPES (addSphere) con radios absolutos R y r (robusto)
     """
     vertices_norm = _vertices_por_nc[nc]
     xyz, vertices = _xyz_from_vertices(nc, vertices_norm, R, r)
+
+    # Vértices para JS
     verts_js = json.dumps(vertices)
 
     # Para no saturar en NC=12, mostramos solo 6 “enlaces”
@@ -400,55 +340,99 @@ def _make_3dmol_embed_html(nc: int, R: float, r: float, etiqueta: str, ancho=560
      class="viewer_3Dmoljs"
      data-element="moldata"
      data-type="xyz"
-     data-backgroundcolor="0xffffff"
+     data-backgroundcolor="#ffffff"
      data-ui="true"
      data-callback="onViewerCreated">
 </div>
 
 <script>
 function onViewerCreated(viewer) {{
-  try {{
-    // Estilos con radios REALES (tu r y R)
-    viewer.setStyle({{elem:"Cl"}}, {{sphere: {{radius: {R}, color: "red", opacity: 0.80}} }});
-    viewer.setStyle({{elem:"Na"}}, {{sphere: {{radius: {r}, color: "blue", opacity: 1.00}} }});
+  const R = {R};
+  const r = {r};
+  const verts = {verts_js};
+  const bonds = {enlaces_js};
 
-    // Enlaces como cilindros (didáctico)
-    const bonds = {enlaces_js};
-    bonds.forEach(v => {{
-      viewer.addCylinder({{
-        start: {{x:0, y:0, z:0}},
-        end: {{x:v[0], y:v[1], z:v[2]}},
-        radius: 0.05,
-        color: "gray"
+  function draw() {{
+    try {{
+      // Limpieza (por si el viewer se reusa)
+      viewer.removeAllShapes();
+      viewer.removeAllLabels();
+
+      // Ejes (si los ves, WebGL + viewer OK)
+      viewer.addAxes(1.2);
+
+      // ESFERAS COMO SHAPES (radio absoluto; robusto)
+      // Aniones
+      verts.forEach(v => {{
+        viewer.addSphere({{
+          center: {{x: v[0], y: v[1], z: v[2]}},
+          radius: R,
+          color: "red",
+          alpha: 0.80
+        }});
       }});
-    }});
 
-    // Ejes (debug útil: si ves ejes, WebGL está OK)
-    viewer.addAxes(1.2);
+      // Catión central
+      viewer.addSphere({{
+        center: {{x: 0, y: 0, z: 0}},
+        radius: r,
+        color: "blue",
+        alpha: 1.00
+      }});
 
-    // Etiqueta
-    viewer.addLabel("{etiqueta_html}", {{
-      position: {{x: 0, y: 0, z: {label_z}}},
-      fontSize: 16,
-      fontColor: "black",
-      backgroundColor: "white",
-      backgroundOpacity: 0.85,
-      inFront: true
-    }});
+      // Enlaces (cilindros)
+      bonds.forEach(v => {{
+        viewer.addCylinder({{
+          start: {{x:0, y:0, z:0}},
+          end: {{x:v[0], y:v[1], z:v[2]}},
+          radius: 0.05,
+          color: "gray"
+        }});
+      }});
 
-    viewer.zoomTo();
-    viewer.render();
+      // Etiqueta
+      viewer.addLabel("{etiqueta_html}", {{
+        position: {{x: 0, y: 0, z: {label_z}}},
+        fontSize: 16,
+        fontColor: "black",
+        backgroundColor: "white",
+        backgroundOpacity: 0.85,
+        inFront: true
+      }});
 
-    // Fuerza resize por si el iframe re-dimensiona
-    setTimeout(() => {{
-      viewer.resize();
+      // Zoom basado en el MODELO cargado desde XYZ (no en shapes)
+      viewer.zoomTo();
       viewer.render();
-    }}, 50);
 
-    console.log("✅ 3Dmol direct viewer OK");
-  }} catch (e) {{
-    console.error("❌ 3Dmol error:", e);
+      setTimeout(() => {{
+        viewer.resize();
+        viewer.render();
+      }}, 50);
+
+      console.log("✅ 3Dmol spheres OK");
+    }} catch (e) {{
+      console.error("❌ draw() error:", e);
+    }}
   }}
+
+  // Espera a que el modelo exista antes de dibujar (evita callback "demasiado pronto")
+  let tries = 0;
+  const timer = setInterval(() => {{
+    tries++;
+    try {{
+      const m = viewer.getModel();
+      const ok = (m && m.selectedAtoms({{}}).length > 0);
+      if (ok || tries > 120) {{
+        clearInterval(timer);
+        draw();
+      }}
+    }} catch (e) {{
+      if (tries > 120) {{
+        clearInterval(timer);
+        draw();
+      }}
+    }}
+  }}, 25);
 }}
 </script>
 
@@ -473,7 +457,7 @@ if modo == "Explorar (elegir NC manualmente)":
 else:
     nc_elegido = nc_predicho
 
-# Diccionario para el Bloque 11 (evita KeyError)
+# Diccionario para el Bloque 10 (evita KeyError)
 visores = {nc: "" for nc in NC_TIPICOS}
 
 if modo == "Comparar todas (3×2)":
@@ -516,7 +500,8 @@ else:
     )
 
     if nc_elegido == nc_predicho:
-        st.markdown('<div style="border: 3px solid gold; padding: 8px; border-radius: 12px;">', unsafe_allow_html=True)
+        st.markdown('<div style="border: 3px solid gold; padding: 8px; border-radius: 12px;">',
+                    unsafe_allow_html=True)
 
     st.markdown(f"### ✅ Geometría mostrada: **NC = {nc_elegido}** · *{GEOMETRIAS[idx]}*")
     st.components.v1.html(visores[nc_elegido], height=580)
@@ -524,12 +509,11 @@ else:
     if nc_elegido == nc_predicho:
         st.markdown("</div>", unsafe_allow_html=True)
 
-    st.caption("Tip: si ves los ejes (XYZ) pero no ves esferas, revisamos estilos/colores; si no ves ni ejes, es WebGL/script.")
+    st.caption("Tip: si ves ejes pero no esferas, casi siempre era el estilo atómico. Aquí ya dibujamos esferas como SHAPES (robusto).")
 
 # ============================================================
-# 11. DISPOSICIÓN EN CUADRÍCULA 3x2 (solo en modo comparar)
+# 10. DISPOSICIÓN EN CUADRÍCULA 3x2 (solo en modo comparar)
 # ============================================================
-
 if modo == "Comparar todas (3×2)":
     st.subheader("🧩 Cuadrícula 3×2 (comparación didáctica)")
 
@@ -566,12 +550,13 @@ if modo == "Comparar todas (3×2)":
         """, unsafe_allow_html=True)
 else:
     st.caption("La cuadrícula completa se muestra solo si eliges **“Comparar todas (3×2)”**.")
+
 # ============================================================
-# 12. LEYENDA DE COLORES Y EXPLICACIÓN TEÓRICA (CORREGIDA)
+# 11. LEYENDA DE COLORES Y EXPLICACIÓN TEÓRICA
 # ============================================================
 with st.expander("🎨 Guía de colores y explicación teórica"):
     col_col1, col_col2, col_col3, col_col4, col_col5 = st.columns(5)
-    
+
     with col_col1:
         st.markdown(
             '<div style="background-color: #555555; background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.2) 0px, rgba(255,255,255,0.2) 5px, transparent 5px, transparent 10px); '
@@ -607,27 +592,21 @@ with st.expander("🎨 Guía de colores y explicación teórica"):
             f'<b>NC = 12</b><br>Cuboctaédrica</div>',
             unsafe_allow_html=True
         )
-    
+
     st.markdown(r"""
-    **Interpretación de la transición 2D → 3D**
-    - El valor **r/R = 0.225** es el límite inferior para la coordinación tetraédrica (3D) y el superior para la triangular (2D).
-    - Para un catión de radio `r` fijo, el tamaño de anión que produce esta transición es **\( R = r / 0.225 \)**.
-    - En la gráfica de zoom, puedes **ajustar el límite superior del eje Y** para ampliar la región inferior y observar con claridad las franjas de NC=3 y NC=4.
-    
-    **Visualizaciones 3D**
-    - Las esferas **rojas** representan los aniones.
-    - La esfera **azul** central es el catión.
-    - Las barras grises indican las direcciones de enlace (solo algunas en NC=12 para no saturar).
-    - Puedes **rotar, desplazar y hacer zoom** sobre cada modelo con el mouse.
-    """)
+**Interpretación de la transición 2D → 3D**
+- El valor **r/R = 0.225** es el límite inferior para la coordinación tetraédrica (3D) y el superior para la triangular (2D).
+- Para un catión de radio `r` fijo, el tamaño de anión que produce esta transición es **\( R = r / 0.225 \)**.
+- En la gráfica de zoom, puedes **ajustar el límite superior del eje Y** para ampliar la región inferior y observar con claridad las franjas de NC=3 y NC=4.
+
+**Visualizaciones 3D**
+- Las esferas **rojas** representan los aniones.
+- La esfera **azul** central es el catión.
+- Las barras grises indican las direcciones de enlace (solo algunas en NC=12 para no saturar).
+- Puedes **rotar, desplazar y hacer zoom** sobre cada modelo con el mouse.
+""")
 
 # ============================================================
-# 13. PIE DE PÁGINA
+# 12. PIE DE PÁGINA
 # ============================================================
-st.caption("App desarrollada con fines académicos por HV Martínez-Tejada. Basado en las reglas de radios de Pauling. Visualizaciones 3D con Py3Dmol.")
-
-
-
-
-
-
+st.caption("App desarrollada con fines académicos por HV Martínez-Tejada. Basado en las reglas de radios de Pauling. Visualizaciones 3D con 3Dmol.js (embedding directo).")
