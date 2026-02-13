@@ -234,7 +234,7 @@ with col_grafica2:
             bbox=dict(boxstyle='round', facecolor=colors[1], alpha=0.85, edgecolor='none')
         )
 
-    # Rótulos rápidos NC=3 / NC=4 en borde derecho
+    # Rótulos rápidos NC=3 / NC=4 (borde derecho) — opcional, lo dejamos
     if y_min_zoom <= 0.155 <= y_max_zoom:
         ax2.text(
             x_max - 0.02, 0.155, 'NC=3', fontsize=8, color='black',
@@ -246,7 +246,7 @@ with col_grafica2:
             verticalalignment='bottom', horizontalalignment='right'
         )
 
-    # ✅ Microajuste estético: etiquetas dentro de franjas con color de franja + texto blanco
+    # ✅ Etiquetas dentro de franjas (NC=3,4,6,8,12) con color de franja + texto blanco
     x_label = x_min + 0.12 * (x_max - x_min)
 
     def etiqueta_franja(y, texto, color_franja):
@@ -257,17 +257,27 @@ with col_grafica2:
                 bbox=dict(boxstyle='round', facecolor=color_franja, alpha=0.85, edgecolor='none')
             )
 
+    # NC=3 (franja 0.155–0.225) — usamos el mismo gris de la franja 2D
+    y_nc3 = (0.155 + 0.225) / 2
+    etiqueta_franja(y_nc3, "NC=3", "#555555")
+
+    # NC=4 (franja 0.225–0.414)
+    y_nc4 = (0.225 + 0.414) / 2
+    etiqueta_franja(y_nc4, "NC=4", colors[1])
+
+    # NC=6 (franja 0.414–0.732)
     y_nc6 = (0.414 + 0.732) / 2
     etiqueta_franja(y_nc6, "NC=6", colors[2])
 
+    # NC=8 (franja 0.732–1.000)
     y_nc8 = (0.732 + 1.000) / 2
     etiqueta_franja(y_nc8, "NC=8", colors[3])
 
+    # NC=12 (si el zoom vertical lo muestra)
     if y_max_zoom > 1.0:
         y_nc12 = (1.000 + y_max_zoom) / 2
         etiqueta_franja(y_nc12, "NC=12", colors[4])
 
-    # Zoom controlado por sliders
     ax2.set_ylim(y_min_zoom, y_max_zoom)
     ax2.set_xlim(x_min, x_max)
     ax2.set_xlabel('Radio del Anión (R) [Å]')
