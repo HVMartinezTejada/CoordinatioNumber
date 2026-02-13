@@ -6,7 +6,7 @@ import numpy as np
 import json
 
 # ============================================================
-# 1. CONFIGURACIÓN INICIAL Y CARGA GLOBAL DE 3DMOL.JS
+# 1. CONFIGURACIÓN INICIAL
 # ============================================================
 st.set_page_config(page_title="Simulador r/R - NC", layout="wide")
 
@@ -141,14 +141,19 @@ col_grafica1, col_grafica2 = st.columns(2)
 R_range_full = [i/100 for i in range(10, 701)]
 r_R_range_full = [radio_cation / R if R > 0 else 0 for R in R_range_full]
 
+# --- GRÁFICA 1: Vista completa ---
 with col_grafica1:
     st.markdown("**Vista completa – modelo extendido**")
     fig1, ax1 = plt.subplots(figsize=(8, 5))
     ax1.plot(R_range_full, r_R_range_full, 'b-', linewidth=2.5, label='r/R')
-    ax1.axhline(y=relacion_r_R, color='r', linestyle='--', alpha=0.7, linewidth=1.5,
-                label=f'Valor actual ({relacion_r_R:.2f})')
-    ax1.axvline(x=radio_anion, color='g', linestyle='--', alpha=0.7, linewidth=1.5,
-                label=f'R actual ({radio_anion:.2f} Å)')
+    ax1.axhline(
+        y=relacion_r_R, color='r', linestyle='--', alpha=0.7, linewidth=1.5,
+        label=f'Valor actual ({relacion_r_R:.2f})'
+    )
+    ax1.axvline(
+        x=radio_anion, color='g', linestyle='--', alpha=0.7, linewidth=1.5,
+        label=f'R actual ({radio_anion:.2f} Å)'
+    )
 
     for i, nc in enumerate(NC_TIPICOS):
         y_min = 0 if i == 0 else LIMITES_NC[i-1]
@@ -162,6 +167,7 @@ with col_grafica1:
     ax1.grid(alpha=0.3)
     st.pyplot(fig1)
 
+# --- GRÁFICA 2: Zoom didáctico con franjas + transición 2D/3D + etiquetas internas NC=6/8 ---
 with col_grafica2:
     st.markdown("**Vista de zoom – análisis detallado (gráfica principal)**")
     margen = 1.0
@@ -178,9 +184,96 @@ with col_grafica2:
 
     fig2, ax2 = plt.subplots(figsize=(8, 5))
     ax2.plot(R_range_zoom, r_R_range_zoom, 'b-', linewidth=2.5, label='r/R')
-    ax2.axhline(y=relacion_r_R, color='r', linestyle='--', alpha=0.7, linewidth=1.5)
-    ax2.axvline(x=radio_anion, color='g', linestyle='--', alpha=0.7, linewidth=1.5)
 
+    # Marcadores del valor actual
+    ax2.axhline(
+        y=relacion_r_R, color='r', linestyle='--', alpha=0.7, linewidth=1.5,
+        label=f'Valor actual ({relacion_r_R:.2f})'
+    )
+    ax2.axvline(
+        x=radio_anion, color='g', linestyle='--', alpha=0.7, linewidth=1.5,
+        label=f'R actual ({radio_anion:.2f} Å)'
+    )
+
+    # Transición 2D/3D: r/R=0.225 y R=r/0.225 (si cae dentro del zoom)
+    R_transicion = radio_cation / 0.225
+    if x_min <= R_transicion <= x_max:
+        ax2.axvline(
+            x=R_transicion, color='purple', linestyle='-.', linewidth=1.8, alpha=0.9,
+            label=f'Transición 2D/3D (R={R_transicion:.2f} Å)'
+        )
+    ax2.axhline(
+        y=0.225, color='purple', linestyle='-.', linewidth=1.8, alpha=0.9,
+        label='Límite 2D/3D (r/R = 0.225)'
+    )
+
+    # Franjas didácticas
+    ax2.axhspan(0.155, 0.225, alpha=0.40, color='#555555', hatch='///',
+                label='Región 2D (NC=3, planar)')
+    ax2.axhspan(0.225, 0.414, alpha=0.35, color=colors[1], label='NC 4')
+    ax2.axhspan(0.414, 0.732, alpha=0.35, color=colors[2], label='NC 6')
+    ax2.axhspan(0.732, 1.000, alpha=0.35, color=colors[3], label='NC 8')
+    if y_max_zoom > 1.0:
+        ax2.axhspan(1.000, y_max_zoom, alpha=0.35, color=colors[4], label='NC 12')
+
+    # Líneas auxiliares en límites
+    ax2.axhline(y=0.155, color='black', linestyle='-', linewidth=1.0, alpha=0.5)
+    ax2.axhline(y=0.225, color='black', linestyle='-', linewidth=1.0, alpha=0.5)
+    for limite in [0.414, 0.732, 1.000]:
+        if limite <= y_max_zoom:
+            ax2.axhline(y=limite, color='gray', linestyle=':', alpha=0.4, linewidth=0.8)
+
+    # Etiquetas 2D / 3D (si caben)
+    if y_min_zoom <= 0.19 <= y_max_zoom:
+        ax2.text(
+            x_min + 0.10, 0.19, '2D', fontsize=11, weight='bold', color='white',
+            bbox=dict(boxstyle='round', facecolor='#555555', alpha=0.85)
+        )
+    if y_min_zoom <= 0.30 <= y_max_zoom:
+        ax2.text(
+            x_min + 0.10, 0.30, '3D', fontsize=11, weight='bold', color='white',
+            bbox=dict(boxstyle='round', facecolor=colors[1], alpha=0.85)
+        )
+
+    # Rótulos rápidos NC=3 / NC=4 en el borde derecho
+    if y_min_zoom <= 0.155 <= y_max_zoom:
+        ax2.text(
+            x_max - 0.02, 0.155, 'NC=3', fontsize=8, color='black',
+            verticalalignment='bottom', horizontalalignment='right'
+        )
+    if y_min_zoom <= 0.225 <= y_max_zoom:
+        ax2.text(
+            x_max - 0.02, 0.225, 'NC=4', fontsize=8, color='black',
+            verticalalignment='bottom', horizontalalignment='right'
+        )
+
+    # ✅ Etiquetas internas dentro de las franjas (NC=6 / NC=8 / NC=12 si aplica)
+    x_label = x_min + 0.12 * (x_max - x_min)
+
+    y_nc6 = (0.414 + 0.732) / 2
+    if y_min_zoom <= y_nc6 <= y_max_zoom:
+        ax2.text(
+            x_label, y_nc6, 'NC=6', fontsize=10, weight='bold', color='black',
+            bbox=dict(boxstyle='round', facecolor='white', alpha=0.55)
+        )
+
+    y_nc8 = (0.732 + 1.000) / 2
+    if y_min_zoom <= y_nc8 <= y_max_zoom:
+        ax2.text(
+            x_label, y_nc8, 'NC=8', fontsize=10, weight='bold', color='black',
+            bbox=dict(boxstyle='round', facecolor='white', alpha=0.55)
+        )
+
+    # NC=12 solo si el zoom vertical llega > 1.0
+    if y_max_zoom > 1.0:
+        y_nc12 = (1.000 + y_max_zoom) / 2
+        if y_min_zoom <= y_nc12 <= y_max_zoom:
+            ax2.text(
+                x_label, y_nc12, 'NC=12', fontsize=10, weight='bold', color='black',
+                bbox=dict(boxstyle='round', facecolor='white', alpha=0.55)
+            )
+
+    # Zoom controlado por sliders
     ax2.set_ylim(y_min_zoom, y_max_zoom)
     ax2.set_xlim(x_min, x_max)
     ax2.set_xlabel('Radio del Anión (R) [Å]')
@@ -257,7 +350,6 @@ function onViewerCreated(viewer) {{
   const bonds = {enlaces_js};
 
   function addAxesLike(viewer, L) {{
-    // Ejes manuales (cylinders) para debug: X rojo, Y verde, Z azul
     viewer.addCylinder({{start:{{x:0,y:0,z:0}}, end:{{x:L,y:0,z:0}}, radius:0.03, color:"red"}});
     viewer.addCylinder({{start:{{x:0,y:0,z:0}}, end:{{x:0,y:L,z:0}}, radius:0.03, color:"green"}});
     viewer.addCylinder({{start:{{x:0,y:0,z:0}}, end:{{x:0,y:0,z:L}}, radius:0.03, color:"blue"}});
@@ -268,17 +360,14 @@ function onViewerCreated(viewer) {{
       if (viewer.removeAllShapes) viewer.removeAllShapes();
       if (viewer.removeAllLabels) viewer.removeAllLabels();
 
-      // Respaldo: fuerza estilo atómico a "sphere" (por si shapes fallaran)
       if (viewer.setStyle) {{
         viewer.setStyle({{}}, {{sphere: {{scale: 1.0}}}});
         viewer.setStyle({{elem:"Cl"}}, {{sphere: {{scale: 1.0, color:"red", opacity:0.80}}}});
         viewer.setStyle({{elem:"Na"}}, {{sphere: {{scale: 1.0, color:"blue", opacity:1.00}}}});
       }}
 
-      // Ejes (manuales) — NO usamos viewer.addAxes (no existe en tu build)
       addAxesLike(viewer, 1.2);
 
-      // ESFERAS como SHAPES (radio absoluto)
       verts.forEach(v => {{
         viewer.addSphere({{
           center: {{x: v[0], y: v[1], z: v[2]}},
@@ -295,7 +384,6 @@ function onViewerCreated(viewer) {{
         alpha: 1.00
       }});
 
-      // Enlaces
       bonds.forEach(v => {{
         viewer.addCylinder({{
           start: {{x:0, y:0, z:0}},
@@ -325,7 +413,6 @@ function onViewerCreated(viewer) {{
       console.log("✅ draw() OK: spheres should be visible");
     }} catch (e) {{
       console.error("❌ draw() error:", e);
-      // Debug rápido: qué métodos existen realmente
       try {{
         console.log("viewer keys:", Object.keys(viewer));
         console.log("typeof addSphere:", typeof viewer.addSphere);
@@ -334,7 +421,6 @@ function onViewerCreated(viewer) {{
     }}
   }}
 
-  // Evita callback "demasiado pronto": espera a que el modelo exista
   let tries = 0;
   const timer = setInterval(() => {{
     tries++;
@@ -419,7 +505,7 @@ else:
     if nc_elegido == nc_predicho:
         st.markdown("</div>", unsafe_allow_html=True)
 
-    st.caption("Ahora NO usamos viewer.addAxes; los ejes se dibujan con cilindros. Si sigue sin haber esferas, la consola del iframe mostrará debug de métodos.")
+    st.caption("Ahora NO usamos viewer.addAxes; los ejes se dibujan con cilindros. Si algo falla, mira la consola del iframe para debug.")
 
 # ============================================================
 # 11. DISPOSICIÓN EN CUADRÍCULA 3x2 (solo en modo comparar)
