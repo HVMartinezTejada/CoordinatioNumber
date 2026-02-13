@@ -167,7 +167,7 @@ with col_grafica1:
     ax1.grid(alpha=0.3)
     st.pyplot(fig1)
 
-# --- GRÁFICA 2: Zoom didáctico con franjas + transición 2D/3D + etiquetas internas NC=6/8 ---
+# --- GRÁFICA 2: Zoom didáctico con franjas + transición 2D/3D + etiquetas internas ---
 with col_grafica2:
     st.markdown("**Vista de zoom – análisis detallado (gráfica principal)**")
     margen = 1.0
@@ -185,7 +185,6 @@ with col_grafica2:
     fig2, ax2 = plt.subplots(figsize=(8, 5))
     ax2.plot(R_range_zoom, r_R_range_zoom, 'b-', linewidth=2.5, label='r/R')
 
-    # Marcadores del valor actual
     ax2.axhline(
         y=relacion_r_R, color='r', linestyle='--', alpha=0.7, linewidth=1.5,
         label=f'Valor actual ({relacion_r_R:.2f})'
@@ -195,7 +194,7 @@ with col_grafica2:
         label=f'R actual ({radio_anion:.2f} Å)'
     )
 
-    # Transición 2D/3D: r/R=0.225 y R=r/0.225 (si cae dentro del zoom)
+    # Transición 2D/3D: r/R=0.225 y R=r/0.225
     R_transicion = radio_cation / 0.225
     if x_min <= R_transicion <= x_max:
         ax2.axvline(
@@ -216,26 +215,26 @@ with col_grafica2:
     if y_max_zoom > 1.0:
         ax2.axhspan(1.000, y_max_zoom, alpha=0.35, color=colors[4], label='NC 12')
 
-    # Líneas auxiliares en límites
+    # Líneas auxiliares
     ax2.axhline(y=0.155, color='black', linestyle='-', linewidth=1.0, alpha=0.5)
     ax2.axhline(y=0.225, color='black', linestyle='-', linewidth=1.0, alpha=0.5)
     for limite in [0.414, 0.732, 1.000]:
         if limite <= y_max_zoom:
             ax2.axhline(y=limite, color='gray', linestyle=':', alpha=0.4, linewidth=0.8)
 
-    # Etiquetas 2D / 3D (si caben)
+    # Etiquetas 2D / 3D
     if y_min_zoom <= 0.19 <= y_max_zoom:
         ax2.text(
             x_min + 0.10, 0.19, '2D', fontsize=11, weight='bold', color='white',
-            bbox=dict(boxstyle='round', facecolor='#555555', alpha=0.85)
+            bbox=dict(boxstyle='round', facecolor='#555555', alpha=0.85, edgecolor='none')
         )
     if y_min_zoom <= 0.30 <= y_max_zoom:
         ax2.text(
             x_min + 0.10, 0.30, '3D', fontsize=11, weight='bold', color='white',
-            bbox=dict(boxstyle='round', facecolor=colors[1], alpha=0.85)
+            bbox=dict(boxstyle='round', facecolor=colors[1], alpha=0.85, edgecolor='none')
         )
 
-    # Rótulos rápidos NC=3 / NC=4 en el borde derecho
+    # Rótulos rápidos NC=3 / NC=4 en borde derecho
     if y_min_zoom <= 0.155 <= y_max_zoom:
         ax2.text(
             x_max - 0.02, 0.155, 'NC=3', fontsize=8, color='black',
@@ -247,31 +246,26 @@ with col_grafica2:
             verticalalignment='bottom', horizontalalignment='right'
         )
 
-    # ✅ Etiquetas internas dentro de las franjas (NC=6 / NC=8 / NC=12 si aplica)
+    # ✅ Microajuste estético: etiquetas dentro de franjas con color de franja + texto blanco
     x_label = x_min + 0.12 * (x_max - x_min)
 
+    def etiqueta_franja(y, texto, color_franja):
+        if y_min_zoom <= y <= y_max_zoom:
+            ax2.text(
+                x_label, y, texto,
+                fontsize=10, weight='bold', color='white',
+                bbox=dict(boxstyle='round', facecolor=color_franja, alpha=0.85, edgecolor='none')
+            )
+
     y_nc6 = (0.414 + 0.732) / 2
-    if y_min_zoom <= y_nc6 <= y_max_zoom:
-        ax2.text(
-            x_label, y_nc6, 'NC=6', fontsize=10, weight='bold', color='black',
-            bbox=dict(boxstyle='round', facecolor='white', alpha=0.55)
-        )
+    etiqueta_franja(y_nc6, "NC=6", colors[2])
 
     y_nc8 = (0.732 + 1.000) / 2
-    if y_min_zoom <= y_nc8 <= y_max_zoom:
-        ax2.text(
-            x_label, y_nc8, 'NC=8', fontsize=10, weight='bold', color='black',
-            bbox=dict(boxstyle='round', facecolor='white', alpha=0.55)
-        )
+    etiqueta_franja(y_nc8, "NC=8", colors[3])
 
-    # NC=12 solo si el zoom vertical llega > 1.0
     if y_max_zoom > 1.0:
         y_nc12 = (1.000 + y_max_zoom) / 2
-        if y_min_zoom <= y_nc12 <= y_max_zoom:
-            ax2.text(
-                x_label, y_nc12, 'NC=12', fontsize=10, weight='bold', color='black',
-                bbox=dict(boxstyle='round', facecolor='white', alpha=0.55)
-            )
+        etiqueta_franja(y_nc12, "NC=12", colors[4])
 
     # Zoom controlado por sliders
     ax2.set_ylim(y_min_zoom, y_max_zoom)
