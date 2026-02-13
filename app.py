@@ -546,7 +546,7 @@ if modo == "Comparar todas (3×2)":
             <p style="text-align: center;">
             <span style="color:blue;">● Catión (central)</span><br>
             <span style="color:red;">● Aniones (coordinados)</span><br><br>
-            Esta cuadrícula solo aparece en “Comparar” para evitar saturación visual.
+            hader.martinez@upb.edu.co.
             </p>
         </div>
         """, unsafe_allow_html=True)
@@ -556,6 +556,7 @@ else:
 # ============================================================
 # 12. PIE DE PÁGINA
 # ============================================================
-st.caption("App desarrollada con fines académicos por H. Vladimir Martínez-Tejada. Basado en las reglas de radios de Pauling. Visualizaciones 3D con 3Dmol.js (embedding directo).")
+st.caption(© 2025 H. Vladimir Martínez-Tejada. Basado en las reglas de radios de Pauling. Visualizaciones 3D con 3Dmol.js (embedding directo). Código y contenido: CC BY 4.0 (atribución requerida).")
+
 
 
