@@ -146,14 +146,10 @@ with col_grafica1:
     st.markdown("**Vista completa – modelo extendido**")
     fig1, ax1 = plt.subplots(figsize=(8, 5))
     ax1.plot(R_range_full, r_R_range_full, 'b-', linewidth=2.5, label='r/R')
-    ax1.axhline(
-        y=relacion_r_R, color='r', linestyle='--', alpha=0.7, linewidth=1.5,
-        label=f'Valor actual ({relacion_r_R:.2f})'
-    )
-    ax1.axvline(
-        x=radio_anion, color='g', linestyle='--', alpha=0.7, linewidth=1.5,
-        label=f'R actual ({radio_anion:.2f} Å)'
-    )
+    ax1.axhline(y=relacion_r_R, color='r', linestyle='--', alpha=0.7, linewidth=1.5,
+                label=f'Valor actual ({relacion_r_R:.2f})')
+    ax1.axvline(x=radio_anion, color='g', linestyle='--', alpha=0.7, linewidth=1.5,
+                label=f'R actual ({radio_anion:.2f} Å)')
 
     for i, nc in enumerate(NC_TIPICOS):
         y_min = 0 if i == 0 else LIMITES_NC[i-1]
@@ -167,7 +163,7 @@ with col_grafica1:
     ax1.grid(alpha=0.3)
     st.pyplot(fig1)
 
-# --- GRÁFICA 2: Zoom didáctico con franjas + transición 2D/3D + etiquetas internas ---
+# --- GRÁFICA 2: Zoom didáctico con franjas + transición 2D/3D + etiquetas internas (auto-evitan curva) ---
 with col_grafica2:
     st.markdown("**Vista de zoom – análisis detallado (gráfica principal)**")
     margen = 1.0
@@ -185,26 +181,18 @@ with col_grafica2:
     fig2, ax2 = plt.subplots(figsize=(8, 5))
     ax2.plot(R_range_zoom, r_R_range_zoom, 'b-', linewidth=2.5, label='r/R')
 
-    ax2.axhline(
-        y=relacion_r_R, color='r', linestyle='--', alpha=0.7, linewidth=1.5,
-        label=f'Valor actual ({relacion_r_R:.2f})'
-    )
-    ax2.axvline(
-        x=radio_anion, color='g', linestyle='--', alpha=0.7, linewidth=1.5,
-        label=f'R actual ({radio_anion:.2f} Å)'
-    )
+    ax2.axhline(y=relacion_r_R, color='r', linestyle='--', alpha=0.7, linewidth=1.5,
+                label=f'Valor actual ({relacion_r_R:.2f})')
+    ax2.axvline(x=radio_anion, color='g', linestyle='--', alpha=0.7, linewidth=1.5,
+                label=f'R actual ({radio_anion:.2f} Å)')
 
     # Transición 2D/3D: r/R=0.225 y R=r/0.225
     R_transicion = radio_cation / 0.225
     if x_min <= R_transicion <= x_max:
-        ax2.axvline(
-            x=R_transicion, color='purple', linestyle='-.', linewidth=1.8, alpha=0.9,
-            label=f'Transición 2D/3D (R={R_transicion:.2f} Å)'
-        )
-    ax2.axhline(
-        y=0.225, color='purple', linestyle='-.', linewidth=1.8, alpha=0.9,
-        label='Límite 2D/3D (r/R = 0.225)'
-    )
+        ax2.axvline(x=R_transicion, color='purple', linestyle='-.', linewidth=1.8, alpha=0.9,
+                    label=f'Transición 2D/3D (R={R_transicion:.2f} Å)')
+    ax2.axhline(y=0.225, color='purple', linestyle='-.', linewidth=1.8, alpha=0.9,
+                label='Límite 2D/3D (r/R = 0.225)')
 
     # Franjas didácticas
     ax2.axhspan(0.155, 0.225, alpha=0.40, color='#555555', hatch='///',
@@ -234,49 +222,63 @@ with col_grafica2:
             bbox=dict(boxstyle='round', facecolor=colors[1], alpha=0.85, edgecolor='none')
         )
 
-    # Rótulos rápidos NC=3 / NC=4 (borde derecho) — opcional, lo dejamos
-    if y_min_zoom <= 0.155 <= y_max_zoom:
+    # ✅ Quitar rótulos redundantes sobre las líneas (NC=3 y NC=4 en el borde derecho)
+    # (antes estaban aquí, ya NO los ponemos)
+
+    # ======================================================
+    # ✅ Etiquetas dentro de franjas con % + auto-desplazamiento
+    # ======================================================
+    x_candidates = [0.12, 0.55, 0.82]  # fracciones del ancho: izquierda, medio, derecha
+    y_tol = max(0.03, 0.04 * (y_max_zoom - y_min_zoom))  # tolerancia: evita tapar curva en zoom apretado
+
+    def _curve_y(x: float) -> float:
+        # curva azul: r/R = r / R
+        return (radio_cation / x) if x > 0 else 999.0
+
+    def _pick_x_away_from_curve(y_target: float) -> float:
+        # elige el primer x candidato donde la curva quede "lejos" de y_target
+        for frac in x_candidates:
+            x = x_min + frac * (x_max - x_min)
+            if abs(_curve_y(x) - y_target) > y_tol:
+                return x
+        # fallback: aléjate del punto de intersección (si cae en el rango)
+        x_at = (radio_cation / y_target) if y_target > 0 else (x_min + x_max) / 2
+        x_left = x_min + x_candidates[0] * (x_max - x_min)
+        x_right = x_min + x_candidates[-1] * (x_max - x_min)
+        return x_right if abs(x_right - x_at) > abs(x_left - x_at) else x_left
+
+    def _label_in_band(y_low, y_high, text, facecolor):
+        y_mid = 0.5 * (y_low + y_high)
+        if not (y_min_zoom <= y_mid <= y_max_zoom):
+            return
+
+        x = _pick_x_away_from_curve(y_mid)
+        y = y_mid
+
+        # Si aun así cae muy cerca de la curva, desplaza un poco dentro de la franja (sin salir)
+        yc = _curve_y(x)
+        if abs(y - yc) <= y_tol:
+            band_h = (y_high - y_low)
+            shift = 0.18 * band_h
+            # mover alejándose de la curva
+            if yc >= y:
+                y = max(y_low + 0.12 * band_h, y - shift)
+            else:
+                y = min(y_high - 0.12 * band_h, y + shift)
+
         ax2.text(
-            x_max - 0.02, 0.155, 'NC=3', fontsize=8, color='black',
-            verticalalignment='bottom', horizontalalignment='right'
-        )
-    if y_min_zoom <= 0.225 <= y_max_zoom:
-        ax2.text(
-            x_max - 0.02, 0.225, 'NC=4', fontsize=8, color='black',
-            verticalalignment='bottom', horizontalalignment='right'
+            x, y, text,
+            fontsize=10, weight='bold', color='white',
+            bbox=dict(boxstyle='round', facecolor=facecolor, alpha=0.85, edgecolor='none')
         )
 
-    # ✅ Etiquetas dentro de franjas (NC=3,4,6,8,12) con color de franja + texto blanco
-    x_label = x_min + 0.12 * (x_max - x_min)
-
-    def etiqueta_franja(y, texto, color_franja):
-        if y_min_zoom <= y <= y_max_zoom:
-            ax2.text(
-                x_label, y, texto,
-                fontsize=10, weight='bold', color='white',
-                bbox=dict(boxstyle='round', facecolor=color_franja, alpha=0.85, edgecolor='none')
-            )
-
-    # NC=3 (franja 0.155–0.225) — usamos el mismo gris de la franja 2D
-    y_nc3 = (0.155 + 0.225) / 2
-    etiqueta_franja(y_nc3, "NC=3", "#555555")
-
-    # NC=4 (franja 0.225–0.414)
-    y_nc4 = (0.225 + 0.414) / 2
-    etiqueta_franja(y_nc4, "NC=4", colors[1])
-
-    # NC=6 (franja 0.414–0.732)
-    y_nc6 = (0.414 + 0.732) / 2
-    etiqueta_franja(y_nc6, "NC=6", colors[2])
-
-    # NC=8 (franja 0.732–1.000)
-    y_nc8 = (0.732 + 1.000) / 2
-    etiqueta_franja(y_nc8, "NC=8", colors[3])
-
-    # NC=12 (si el zoom vertical lo muestra)
+    # Porcentajes (según tu tabla: rango relevante 0.155–1.000; excluye NC=12)
+    _label_in_band(0.155, 0.225, "NC=3 (8.3%)", "#555555")
+    _label_in_band(0.225, 0.414, "NC=4 (22.4%)", colors[1])
+    _label_in_band(0.414, 0.732, "NC=6 (37.6%)", colors[2])
+    _label_in_band(0.732, 1.000, "NC=8 (31.7%)", colors[3])
     if y_max_zoom > 1.0:
-        y_nc12 = (1.000 + y_max_zoom) / 2
-        etiqueta_franja(y_nc12, "NC=12", colors[4])
+        _label_in_band(1.000, y_max_zoom, "NC=12", colors[4])
 
     ax2.set_ylim(y_min_zoom, y_max_zoom)
     ax2.set_xlim(x_min, x_max)
