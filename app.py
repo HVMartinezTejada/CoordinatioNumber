@@ -551,10 +551,11 @@ if modo == "Comparar todas (3×2)":
         </div>
         """, unsafe_allow_html=True)
 else:
-    st.caption("Curso Ciencia de Los Materiales en Jngenierías")
+    st.caption("Curso Ciencia de Los Materiales")
 
 # ============================================================
 # 12. PIE DE PÁGINA
 # ============================================================
 st.caption("App desarrollada con fines académicos por H. Vladimir Martínez-Tejada. Basado en las reglas de radios de Pauling. Visualizaciones 3D con 3Dmol.js (embedding directo).")
+
 
