@@ -511,7 +511,7 @@ else:
     if nc_elegido == nc_predicho:
         st.markdown("</div>", unsafe_allow_html=True)
 
-    st.caption("Ahora NO usamos viewer.addAxes; los ejes se dibujan con cilindros. Si algo falla, mira la consola del iframe para debug.")
+    st.caption("La coordinación octaédrica (NC=6) es muy común en muchos sólidos iónicos, lo que la hace geométricamente ‘robusta’. Cuanto más amplio es el intervalo geométrico, mayor suele ser la tolerancia a variaciones efectivas de radios (por polarización, distorsiones y mezclas iónico–covalente), aunque la coordinación real dependerá también de energía de la red y de la química específica")
 
 # ============================================================
 # 11. DISPOSICIÓN EN CUADRÍCULA 3x2 (solo en modo comparar)
@@ -551,9 +551,10 @@ if modo == "Comparar todas (3×2)":
         </div>
         """, unsafe_allow_html=True)
 else:
-    st.caption("La cuadrícula completa se muestra solo si eliges **“Comparar todas (3×2)”**.")
+    st.caption("Curso Ciencia de Los Materiales en Jngenierías")
 
 # ============================================================
 # 12. PIE DE PÁGINA
 # ============================================================
-st.caption("App desarrollada con fines académicos por HV Martínez-Tejada. Basado en las reglas de radios de Pauling. Visualizaciones 3D con 3Dmol.js (embedding directo).")
+st.caption("App desarrollada con fines académicos por H. Vladimir Martínez-Tejada. Basado en las reglas de radios de Pauling. Visualizaciones 3D con 3Dmol.js (embedding directo).")
+
