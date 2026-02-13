@@ -365,6 +365,7 @@ def _make_3dmol_embed_html(nc: int, R: float, r: float, etiqueta: str, ancho=560
     """
     vertices_norm = _vertices_por_nc[nc]
     xyz, vertices = _xyz_from_vertices(nc, vertices_norm, R, r)
+    verts_js = json.dumps(vertices)
 
     # Para no saturar en NC=12, mostramos solo 6 “enlaces”
     enlaces = vertices[:6] if nc == 12 else vertices
@@ -624,6 +625,7 @@ with st.expander("🎨 Guía de colores y explicación teórica"):
 # 13. PIE DE PÁGINA
 # ============================================================
 st.caption("App desarrollada con fines académicos por HV Martínez-Tejada. Basado en las reglas de radios de Pauling. Visualizaciones 3D con Py3Dmol.")
+
 
 
 
