@@ -556,7 +556,8 @@ else:
 # ============================================================
 # 12. PIE DE PÁGINA
 # ============================================================
-st.caption(© 2025 H. Vladimir Martínez-Tejada. Basado en las reglas de radios de Pauling. Visualizaciones 3D con 3Dmol.js (embedding directo). Código y contenido: CC BY 4.0 (atribución requerida).")
+st.caption(©️2025 H. Vladimir Martínez-Tejada. Basado en las reglas de radios de Pauling. Visualizaciones 3D con 3Dmol.js (embedding directo). Código y contenido: CC BY 4.0 (atribución requerida).")
+
 
 
 
