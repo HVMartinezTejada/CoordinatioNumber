@@ -326,7 +326,7 @@ with col_grafica2:
     ax2.grid(alpha=0.3)
     st.pyplot(fig2)
 # ============================================================
-# 10. VISUALIZACIONES 3D - Embedding DIRECTO (sin py3Dmol HTML)
+# 10. VISUALIZACIONES 3D — Embedding directo (SIN py3Dmol)
 # ============================================================
 
 st.subheader("🧊 Geometrías de coordinación en 3D")
@@ -343,143 +343,118 @@ _vertices_por_nc = {
     12: VERTICES_NC12,
 }
 
-# CDN(s) para 3Dmol-min.js (evitamos 3dmol.org/build/3Dmol.ui-min.js)
-THREEDMOL_PRIMARY = "https://cdn.jsdelivr.net/npm/3dmol@1.6.0/build/3Dmol-min.js"
-THREEDMOL_FALLBACK = "https://unpkg.com/3dmol@1.6.0/build/3Dmol-min.js"
+def _xyz_from_vertices(nc: int, vertices_norm, R: float, r: float) -> tuple[str, list]:
+    """Construye un XYZ con 1 catión (Na) en el origen + NC aniones (Cl) en los vértices."""
+    dist = R + r
+    vertices = [[v[0]*dist, v[1]*dist, v[2]*dist] for v in vertices_norm]
 
-def _make_viewer_html_direct(
-    nc: int,
-    R: float,
-    r: float,
-    etiqueta: str,
-    vertices_norm: list,
-    ancho: int = 560,
-    alto: int = 560,
-    background: str = "white",
-    spin: bool = False
-) -> str:
+    n_atoms = nc + 1
+    lines = [str(n_atoms), f"NC={nc} ionic coordination (Na center, Cl ligands)"]
+    lines.append(f"Na 0.00000 0.00000 0.00000")
+    for (x, y, z) in vertices:
+        lines.append(f"Cl {x:.5f} {y:.5f} {z:.5f}")
+
+    return "\n".join(lines), vertices
+
+def _make_3dmol_embed_html(nc: int, R: float, r: float, etiqueta: str, ancho=560, alto=560) -> str:
     """
-    Crea un iframe HTML autocontenido que:
-    - Carga 3Dmol-min.js dentro del iframe (con fallback)
-    - Instancia viewer con createViewer()
-    - Dibuja esferas + cilindros + label (directamente con la API JS de 3Dmol)
+    Embedding canónico con viewer_3Dmoljs:
+    - Carga 3Dmol-min.js + 3Dmol.ui-min.js
+    - Inserta XYZ oculto
+    - Usa data-callback para aplicar estilos con radios reales (sphere.radius)
     """
-    distancia_centro = R + r
-    vertices = [[v[0]*distancia_centro, v[1]*distancia_centro, v[2]*distancia_centro] for v in vertices_norm]
-    enlaces_mostrar = vertices[:6] if nc == 12 else vertices
+    vertices_norm = _vertices_por_nc[nc]
+    xyz, vertices = _xyz_from_vertices(nc, vertices_norm, R, r)
+
+    # Para no saturar en NC=12, mostramos solo 6 “enlaces”
+    enlaces = vertices[:6] if nc == 12 else vertices
+    enlaces_js = json.dumps(enlaces)
+
+    # Label: 3Dmol interpreta texto como HTML => usamos <br>
+    etiqueta_html = (etiqueta
+                     .replace("\\n", "<br>")
+                     .replace("\n", "<br>")
+                     .replace('"', "&quot;"))
+
     max_z = max([p[2] for p in vertices] + [0.0])
     label_z = max_z + 2.2
 
-    vid = f"viewer_{uuid.uuid4().hex}"
-
-    # Escapes seguros para JS
-    etiqueta_js = json.dumps(etiqueta)
-    bg_js = json.dumps(background)
-
-    # Construimos comandos JS para dibujar (esferas/cilindros)
-    spheres_js = []
-    for (x, y, z) in vertices:
-        spheres_js.append(f"""
-          viewer.addSphere({{
-            center: {{x:{x:.6f}, y:{y:.6f}, z:{z:.6f}}},
-            radius: {R:.6f},
-            color: 'red',
-            alpha: 0.80
-          }});
-        """)
-
-    # Catión central
-    spheres_js.append(f"""
-      viewer.addSphere({{
-        center: {{x:0, y:0, z:0}},
-        radius: {r:.6f},
-        color: 'blue',
-        alpha: 1.0
-      }});
-    """)
-
-    cylinders_js = []
-    for (x, y, z) in enlaces_mostrar:
-        cylinders_js.append(f"""
-          viewer.addCylinder({{
-            start: {{x:0, y:0, z:0}},
-            end:   {{x:{x:.6f}, y:{y:.6f}, z:{z:.6f}}},
-            radius: 0.05,
-            color: 'gray'
-          }});
-        """)
-
-    spin_js = "viewer.spin('y', 1);" if spin else ""
-
     html = f"""
-    <div id="{vid}" style="width: {ancho}px; height: {alto}px; position: relative;"></div>
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <script src="https://3Dmol.org/build/3Dmol-min.js"></script>
+  <script src="https://3Dmol.org/build/3Dmol.ui-min.js"></script>
+  <style>
+    body {{ margin: 0; padding: 0; background: transparent; }}
+    #viewer {{ width: {ancho}px; height: {alto}px; position: relative; }}
+  </style>
+</head>
+<body>
 
-    <script>
-      (function() {{
-        function loadScript(src) {{
-          return new Promise((resolve, reject) => {{
-            const s = document.createElement('script');
-            s.src = src;
-            s.async = false;
-            s.onload = () => resolve(src);
-            s.onerror = () => reject(new Error('Failed loading: ' + src));
-            document.head.appendChild(s);
-          }});
-        }}
+<pre id="moldata" style="display:none;">{xyz}</pre>
 
-        async function boot() {{
-          // Cargar 3Dmol con fallback
-          try {{
-            await loadScript("{THREEDMOL_PRIMARY}");
-          }} catch (e1) {{
-            console.warn(e1.message);
-            await loadScript("{THREEDMOL_FALLBACK}");
-          }}
+<div id="viewer"
+     class="viewer_3Dmoljs"
+     data-element="moldata"
+     data-type="xyz"
+     data-backgroundcolor="0xffffff"
+     data-ui="true"
+     data-callback="onViewerCreated">
+</div>
 
-          if (!window.$3Dmol) {{
-            console.error("❌ $3Dmol no disponible dentro del iframe.");
-            return;
-          }}
+<script>
+function onViewerCreated(viewer) {{
+  try {{
+    // Estilos con radios REALES (tu r y R)
+    viewer.setStyle({{elem:"Cl"}}, {{sphere: {{radius: {R}, color: "red", opacity: 0.80}} }});
+    viewer.setStyle({{elem:"Na"}}, {{sphere: {{radius: {r}, color: "blue", opacity: 1.00}} }});
 
-          const el = document.getElementById("{vid}");
-          const viewer = $3Dmol.createViewer(el, {{ backgroundColor: {bg_js} }});
+    // Enlaces como cilindros (didáctico)
+    const bonds = {enlaces_js};
+    bonds.forEach(v => {{
+      viewer.addCylinder({{
+        start: {{x:0, y:0, z:0}},
+        end: {{x:v[0], y:v[1], z:v[2]}},
+        radius: 0.05,
+        color: "gray"
+      }});
+    }});
 
-          // Aniones + catión
-          {''.join(spheres_js)}
+    // Ejes (debug útil: si ves ejes, WebGL está OK)
+    viewer.addAxes(1.2);
 
-          // Enlaces
-          {''.join(cylinders_js)}
+    // Etiqueta
+    viewer.addLabel("{etiqueta_html}", {{
+      position: {{x: 0, y: 0, z: {label_z}}},
+      fontSize: 16,
+      fontColor: "black",
+      backgroundColor: "white",
+      backgroundOpacity: 0.85,
+      inFront: true
+    }});
 
-          // Etiqueta
-          viewer.addLabel({etiqueta_js}, {{
-            position: {{x:0, y:0, z:{label_z:.6f}}},
-            fontSize: 16,
-            fontColor: 'black',
-            backgroundColor: 'white',
-            backgroundOpacity: 0.8,
-            inFront: true
-          }});
+    viewer.zoomTo();
+    viewer.render();
 
-          // Cámara y render
-          viewer.setView({{
-            fov: 35,
-            position: [0, 0, {distancia_centro*3.5:.6f}],
-            up: [0, 1, 0]
-          }});
+    // Fuerza resize por si el iframe re-dimensiona
+    setTimeout(() => {{
+      viewer.resize();
+      viewer.render();
+    }}, 50);
 
-          viewer.zoomTo();
-          viewer.render();
-          {spin_js}
+    console.log("✅ 3Dmol direct viewer OK");
+  }} catch (e) {{
+    console.error("❌ 3Dmol error:", e);
+  }}
+}}
+</script>
 
-          console.log("✅ 3Dmol direct viewer OK");
-        }}
-
-        boot();
-      }})();
-    </script>
-    """
+</body>
+</html>
+"""
     return html
-
 
 modo = st.radio(
     "Modo de visualización",
@@ -497,7 +472,7 @@ if modo == "Explorar (elegir NC manualmente)":
 else:
     nc_elegido = nc_predicho
 
-# Diccionario para render (evita KeyError)
+# Diccionario para el Bloque 11 (evita KeyError)
 visores = {nc: "" for nc in NC_TIPICOS}
 
 if modo == "Comparar todas (3×2)":
@@ -517,16 +492,9 @@ if modo == "Comparar todas (3×2)":
         etiqueta = f"NC = {nc}\\n{GEOMETRIAS[idx]}\\nr/R: {intervalo}"
         r_rep = r_R_representativo[nc] * R_ANION_FIJO
 
-        visores[nc] = _make_viewer_html_direct(
-            nc=nc,
-            R=R_ANION_FIJO,
-            r=r_rep,
-            etiqueta=etiqueta,
-            vertices_norm=_vertices_por_nc[nc],
-            ancho=450,
-            alto=450,
-            background="white",
-            spin=False
+        visores[nc] = _make_3dmol_embed_html(
+            nc, R_ANION_FIJO, r_rep, etiqueta,
+            ancho=450, alto=450
         )
 
     st.success("Modo comparar activado: se renderizan todas las geometrías (3×2).")
@@ -541,74 +509,24 @@ else:
         f"r/R = {relacion_r_R:.3f}"
     )
 
-    visores[nc_elegido] = _make_viewer_html_direct(
-        nc=nc_elegido,
-        R=radio_anion,
-        r=radio_cation,
-        etiqueta=etiqueta,
-        vertices_norm=_vertices_por_nc[nc_elegido],
-        ancho=560,
-        alto=560,
-        background="white",
-        spin=False
+    visores[nc_elegido] = _make_3dmol_embed_html(
+        nc_elegido, radio_anion, radio_cation, etiqueta,
+        ancho=560, alto=560
     )
 
     if nc_elegido == nc_predicho:
         st.markdown('<div style="border: 3px solid gold; padding: 8px; border-radius: 12px;">', unsafe_allow_html=True)
 
     st.markdown(f"### ✅ Geometría mostrada: **NC = {nc_elegido}** · *{GEOMETRIAS[idx]}*")
-    st.components.v1.html(visores[nc_elegido], height=600)
+    st.components.v1.html(visores[nc_elegido], height=580)
 
     if nc_elegido == nc_predicho:
         st.markdown("</div>", unsafe_allow_html=True)
 
-    st.caption("En consola del iframe deberías ver: ✅ 3Dmol direct viewer OK")
-
+    st.caption("Tip: si ves los ejes (XYZ) pero no ves esferas, revisamos estilos/colores; si no ves ni ejes, es WebGL/script.")
 
 # ============================================================
 # 11. DISPOSICIÓN EN CUADRÍCULA 3x2 (solo en modo comparar)
-# ============================================================
-
-if modo == "Comparar todas (3×2)":
-    st.subheader("🧩 Cuadrícula 3×2 (comparación didáctica)")
-
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown("**NC = 3**  ·  *Triangular*")
-        st.components.v1.html(visores[3], height=480)
-    with col2:
-        st.markdown("**NC = 4**  ·  *Tetraédrica*")
-        st.components.v1.html(visores[4], height=480)
-
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown("**NC = 6**  ·  *Octaédrica*")
-        st.components.v1.html(visores[6], height=480)
-    with col2:
-        st.markdown("**NC = 8**  ·  *Cúbica*")
-        st.components.v1.html(visores[8], height=480)
-
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown("**NC = 12**  ·  *Cuboctaédrica (Compacta)*")
-        st.components.v1.html(visores[12], height=480)
-    with col2:
-        st.markdown("""
-        <div style="background-color: #f0f2f6; padding: 20px; border-radius: 10px; height: 480px; display: flex; flex-direction: column; justify-content: center;">
-            <h4 style="text-align: center;">📘 Información</h4>
-            <p style="text-align: center;">
-            <span style="color:blue;">● Catión (central)</span><br>
-            <span style="color:red;">● Aniones (coordinados)</span><br><br>
-            Esta cuadrícula solo aparece en “Comparar” para evitar saturación visual.
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-else:
-    st.caption("La cuadrícula completa se muestra solo si eliges **“Comparar todas (3×2)”**.")
-
-
-# ============================================================
-# 11. DISPOSICIÓN EN CUADRÍCULA 3x2 (ARREGLADO: componentes; solo en modo comparar)
 # ============================================================
 
 if modo == "Comparar todas (3×2)":
@@ -706,6 +624,7 @@ with st.expander("🎨 Guía de colores y explicación teórica"):
 # 13. PIE DE PÁGINA
 # ============================================================
 st.caption("App desarrollada con fines académicos por HV Martínez-Tejada. Basado en las reglas de radios de Pauling. Visualizaciones 3D con Py3Dmol.")
+
 
 
 
