@@ -511,7 +511,10 @@ else:
     if nc_elegido == nc_predicho:
         st.markdown("</div>", unsafe_allow_html=True)
 
-    st.caption("La coordinación octaédrica (NC=6) es muy común en muchos sólidos iónicos, lo que la hace geométricamente ‘robusta’. Cuanto más amplio es el intervalo geométrico, mayor suele ser la tolerancia a variaciones efectivas de radios (por polarización, distorsiones y mezclas iónico–covalente), aunque la coordinación real dependerá también de energía de la red y de la química específica")
+    st.caption("⚠️ NC=6: Es muy común en muchos sólidos iónicos, es geométricamente ‘robusta’.
+    ⚠️ NC=12: Límite de empaquetamiento (r≈R); en sales binarias típicas la regla r/R suele no ser aplicable estrictamente—úsalo como guía didáctica.
+    ⚠️ Cuanto más amplio es el intervalo geométrico, mayor suele ser la tolerancia a variaciones de radios (por polarización, distorsiones y mezclas iónico–covalente)
+    ⚠️ La coordinación real dependerá también de energía de la red y de la química específica")
 
 # ============================================================
 # 11. DISPOSICIÓN EN CUADRÍCULA 3x2 (solo en modo comparar)
@@ -557,6 +560,7 @@ else:
 # 12. PIE DE PÁGINA
 # ============================================================
 st.caption("©️2025 H. Vladimir Martínez-Tejada. Basado en las reglas de radios de Pauling. Visualizaciones 3D con 3Dmol.js (embedding directo). Código y contenido: CC BY 4.0 (atribución requerida).")
+
 
 
 
